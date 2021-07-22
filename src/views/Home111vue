@@ -13,22 +13,12 @@
         :value="item.value"
       />
     </el-select>
-    <div @click="addStar()">添加</div>
-    <div @click="localpos()">定位88888888888888指定</div>
-    <div @click="localpos1()">定位指定1</div>
-    <div @click="localpos2()">定位指定2</div>
+    <!-- <span @click="localpos()">定位指定</span>
+    <span @click="localpos1()">定位指定1</span> -->
+    <span @click="localpos2()">定位指定2</span>
+    <span @click="addRandomFeature()">添加动画</span>
+    <span @click="animateDot()">animateDot</span>
     <div id="map" class="map" />
-
-    <!-- <div
-      class="popup-info-div"
-      style="height：100px;width:100px;border:1px solid red;display:none"
-    >
-      <div id="popup-info" class="ol-popup">
-        <a href="#" id="popup-closer" class="ol-popup-closer">close</a>
-        <div id="popup-title" class="popup-title"></div>
-        <div id="popup-content"></div>
-      </div>
-    </div> -->
   </div>
 </template>
 
@@ -44,7 +34,6 @@ import VectorSource from "ol/source/Vector";
 import { Point, LineString, Polygon } from "ol/geom";
 import XYZ from "ol/source/XYZ";
 import { Map, View, Feature, ol } from "ol";
-
 import {
   Circle,
   Fill,
@@ -53,7 +42,6 @@ import {
   Text,
   Icon,
   Circle as CircleStyle,
-  RegularShape
 } from "ol/style.js";
 import Overlay from "ol/Overlay.js";
 import { Image } from "ol/layer.js";
@@ -61,6 +49,10 @@ import { OSM, Vector, ImageStatic } from "ol/source";
 import { defaults as defaultControls } from "ol/control";
 
 import Draw, { createBox, createRegularPolygon } from "ol/interaction/Draw";
+import { unByKey } from "ol/Observable";
+import { getVectorContext } from "ol/render";
+import { easeIn, easeOut } from "ol/easing";
+import { Tile as TileLayer } from "ol/layer";
 
 export default {
   data() {
@@ -103,60 +95,23 @@ export default {
       draw: null,
       source: null,
       multiSource: null,
-      vector:null
+      feature: null,
+      duration: 3000,
+      tileLayer: null,
     };
   },
   mounted() {
     this.initmap();
+    this.addFeather();
   },
 
   methods: {
-    addStar() {
-      let extent = this.view.calculateExtent(this.map.getSize());
-      for (let i = 0; i < 1; i++) {
-        var dx = extent[2] - extent[0],
-          dy = extent[3] - extent[1];
-        setTimeout(this.addFeature, 200 * (i + 1), [
-          extent[0] + dx * Math.random(1),
-          extent[1] + dy * Math.random(1),
-        ]);
-      }
-    },
-
-     addFeature(coordinates) {
-
-        var f = new ol.Feature({
-            geometry: new ol.geom.Point(coordinates)
-        });
-        var geom = f.getGeometry();
-        var xy = geom.getCoordinates();
-        var extent = this.view.calculateExtent(this.map.getSize());
-        var dy = extent[3] - xy[1];
-        var c = 0.01;
-        var key = this.map.on("postcompose", function (e) {
-            if (c >= 1) {
-                this.map.unByKey(key);
-            }
-            c += 0.01;
-            geom.setCoordinates([xy[0], xy[1] + dy * (1 - ol.easing.inAndOut(c))]);
-        });
-        geom.setCoordinates([xy[0], xy[1] + dy * (1 - ol.easing.inAndOut(c))]);
-        
-        this.vector.getSource().addFeature(f);
-    },
-
     localpos() {
       const polygon = this.multiSource.getFeatures()[3].getGeometry();
       this.view.fit(polygon, { padding: [170, 50, 30, 150] });
     },
     localpos1() {
       const polygon1 = this.multiSource.getFeatures()[1].getGeometry();
-      console.log(
-        "nihao ",
-        polygon1,
-        polygon1.getCoordinates(),
-        this.map.getSize()
-      );
       this.view.centerOn(
         polygon1.getCoordinates(),
         this.map.getSize(),
@@ -164,14 +119,34 @@ export default {
       );
     },
     localpos2() {
-      const polygon2 = this.multiSource.getFeatures()[1].getGeometry();
-      this.view.fit(polygon2, {
-        padding: [170, 50, 30, 150],
-        minResolution: 50,
-      });
+      // const polygon2 = this.multiSource.getFeatures()[1].getGeometry()
+      // this.view.fit(polygon2, { padding: [170, 50, 30, 150], minResolution: 50 })
+      console.log("查看中心带你", this.view.getCenter());
+      const rome = [160, 60];
+      const center = this.view.getCenter();
+      this.view.animate(
+        {
+          center: [
+            center[0] + (rome[0] - center[0]) / 2,
+            center[1] + (rome[1] - center[1]) / 2,
+          ],
+          rotation: Math.PI,
+          easing: easeIn,
+        },
+        {
+          center: rome,
+          rotation: 2 * Math.PI,
+          easing: easeOut,
+        }
+      );
     },
 
     initmap() {
+      this.tileLayer = new TileLayer({
+        source: new OSM({
+          wrapX: false,
+        }),
+      });
       // 定义坐标系
       var projection = new Projection({
         // code: "EPSG:900931", // 用“米”做单位的x/y坐标的投影
@@ -212,10 +187,9 @@ export default {
 
       this.source = new VectorSource({ wrapX: false });
 
-       this.vector = new VectorLayer({
+      var vector = new VectorLayer({
         source: this.source,
       });
-
 
       this.map = new olMap({
         target: "map",
@@ -224,7 +198,8 @@ export default {
         }).extend([]),
         layers: [
           imageLayer,
-          this.vector,
+          vector,
+          this.tileLayer,
 
           // vlayer,
         ],
@@ -295,9 +270,70 @@ export default {
       }
     },
 
+    animateDot() {
+      var iconFeatureq = new Feature(new Point([100, 100]));
+      iconFeatureq.set("style", this.createStyle("data/icon.png", undefined));
+      this.multiSource.addFeature(iconFeatureq);
+    },
+    //添加随机的点
+    addRandomFeature() {
+      const x = Math.random() * 100;
+      const y = Math.random() * 100;
+      console.log("随机点", x, y);
+      this.feature = new Feature(new Point([x, y]));
+      this.feature.set("style", this.createStyle("data/icon.png", undefined));
+      this.multiSource.addFeature(this.feature);
+      this.flash(this.feature)
+    },
+
+    addFeather() {
+      // const that=this
+      // this.multiSource.on('addfeature',function(e){
+      //   that.flash(e)
+      // })  
+    },
+
+    flash(feature) {
+      const start = Date.now();
+      const flashGeom = feature.getGeometry().clone();
+      const listenerKey = this.tileLayer.on("postrender", animate);
+      // const listenerKey = this.tileLayer.on("postcompose", animate);
+      const self = this;
+      const duration = 1000;
+      function animate(event) {
+        const frameState = event.frameState;
+        const elapsed = frameState.time - start;
+        if (elapsed >= duration) {
+          unByKey(listenerKey);
+          return;
+        }
+        const vectorContext = getVectorContext(event);
+        const elapsedRatio = elapsed / duration;
+        // radius will be 5 at start and 30 at end.
+        const radius = easeOut(elapsedRatio) * 25 + 5;
+        const opacity = easeOut(1 - elapsedRatio);
+
+        const style = new Style({
+          image: new CircleStyle({
+            radius: radius,
+            stroke: new Stroke({
+              color: "rgba(255, 0, 0, " + opacity + ")",
+              // width: 0.25 + opacity,
+              width:2+opacity
+            }),
+          }),
+        });
+
+        vectorContext.setStyle(style);
+        vectorContext.drawGeometry(flashGeom);
+        // tell OpenLayers to continue postrender animation
+        self.map.render();
+      }
+    },
+
     addIcon() {
       var iconFeature = new Feature(new Point([0, 0]));
-      iconFeature.set("style", this.createStar("data/icon.png", undefined));
+      iconFeature.set("style", this.createStyle("data/icon.png", undefined));
 
       var iconFeature1 = new Feature(new Point([60, 0]));
       iconFeature1.set("style", this.createStyle("data/icon.png", undefined));
@@ -417,26 +453,6 @@ export default {
         }),
       });
     },
-
-    createStar(){
-      return new Style({
-        image:new RegularShape({
-            points: 5,
-            radius1: 20,
-            radius2: 10,
-            fill:new Fill({
-               color: "#ffff00"
-            }),
-            stroke:new Stroke({
-                width: 1,
-                color: "00ffff"
-            })
-
-        })
-      })
-
-    },
-    
 
     FenceStyle(f, r) {
       return [
