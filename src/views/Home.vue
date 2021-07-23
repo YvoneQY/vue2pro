@@ -53,14 +53,15 @@ import {
   Text,
   Icon,
   Circle as CircleStyle,
-  RegularShape
+  RegularShape,
 } from "ol/style.js";
 import Overlay from "ol/Overlay.js";
 import { Image } from "ol/layer.js";
 import { OSM, Vector, ImageStatic } from "ol/source";
 import { defaults as defaultControls } from "ol/control";
-
+import { GeoJSON } from "ol/format.js";
 import Draw, { createBox, createRegularPolygon } from "ol/interaction/Draw";
+import bus from '@/util/bus'
 
 export default {
   data() {
@@ -103,14 +104,24 @@ export default {
       draw: null,
       source: null,
       multiSource: null,
-      vector:null
+      vector: null,
+      ws: null,
+      bLockEx:true
     };
   },
   mounted() {
     this.initmap();
+    this.webSocketPosition();
+    this.busEmitOn()
   },
 
   methods: {
+    busEmitOn(){
+      console.log('初始化')
+      bus.$on('testbus',content=>{
+        console.log('内容多次',content)
+      })
+    },
     addStar() {
       let extent = this.view.calculateExtent(this.map.getSize());
       for (let i = 0; i < 1; i++) {
@@ -123,26 +134,25 @@ export default {
       }
     },
 
-     addFeature(coordinates) {
-
-        var f = new ol.Feature({
-            geometry: new ol.geom.Point(coordinates)
-        });
-        var geom = f.getGeometry();
-        var xy = geom.getCoordinates();
-        var extent = this.view.calculateExtent(this.map.getSize());
-        var dy = extent[3] - xy[1];
-        var c = 0.01;
-        var key = this.map.on("postcompose", function (e) {
-            if (c >= 1) {
-                this.map.unByKey(key);
-            }
-            c += 0.01;
-            geom.setCoordinates([xy[0], xy[1] + dy * (1 - ol.easing.inAndOut(c))]);
-        });
+    addFeature(coordinates) {
+      var f = new ol.Feature({
+        geometry: new ol.geom.Point(coordinates),
+      });
+      var geom = f.getGeometry();
+      var xy = geom.getCoordinates();
+      var extent = this.view.calculateExtent(this.map.getSize());
+      var dy = extent[3] - xy[1];
+      var c = 0.01;
+      var key = this.map.on("postcompose", function (e) {
+        if (c >= 1) {
+          this.map.unByKey(key);
+        }
+        c += 0.01;
         geom.setCoordinates([xy[0], xy[1] + dy * (1 - ol.easing.inAndOut(c))]);
-        
-        this.vector.getSource().addFeature(f);
+      });
+      geom.setCoordinates([xy[0], xy[1] + dy * (1 - ol.easing.inAndOut(c))]);
+
+      this.vector.getSource().addFeature(f);
     },
 
     localpos() {
@@ -212,10 +222,9 @@ export default {
 
       this.source = new VectorSource({ wrapX: false });
 
-       this.vector = new VectorLayer({
+      this.vector = new VectorLayer({
         source: this.source,
       });
-
 
       this.map = new olMap({
         target: "map",
@@ -418,25 +427,22 @@ export default {
       });
     },
 
-    createStar(){
+    createStar() {
       return new Style({
-        image:new RegularShape({
-            points: 5,
-            radius1: 20,
-            radius2: 10,
-            fill:new Fill({
-               color: "#ffff00"
-            }),
-            stroke:new Stroke({
-                width: 1,
-                color: "00ffff"
-            })
-
-        })
-      })
-
+        image: new RegularShape({
+          points: 5,
+          radius1: 20,
+          radius2: 10,
+          fill: new Fill({
+            color: "#ffff00",
+          }),
+          stroke: new Stroke({
+            width: 1,
+            color: "00ffff",
+          }),
+        }),
+      });
     },
-    
 
     FenceStyle(f, r) {
       return [
@@ -473,6 +479,91 @@ export default {
         }),
       ];
     },
+
+    webSocketPosition() {
+      const self = this;
+      self.systemID = new Date().getTime().toString();
+      var param = JSON.stringify({
+        register: self.systemID,
+      });
+      if ("WebSocket" in window) {
+        let url =
+          "ws://192.168.3.214:8080/socket/websocket/socketServer.do";
+        self.ws = new WebSocket(url);
+        self.ws.onopen = function () {
+          self.webSocketOnSend(param);
+
+          console.log("数据发送中...");
+        };
+        self.ws.onmessage = function (evt) {
+          console.log(evt);
+          //  self.getMessage(evt.data);
+        };
+
+        self.ws.onmessage = function (evt) {
+           console.log(evt.data);
+           self.getMessage(JSON.parse(evt.data));
+        };
+
+        self.ws.onclose = function () {
+          console.log("连接已关闭...");
+        };
+      } else {
+        console.log("您的浏览器不支持WebSocket!");
+      }
+    },
+    webSocketOnSend(data) {
+      const self = this;
+      if (self.ws.readyState === 1) {
+        self.ws.send(data);
+      }
+    },
+
+    getMessage(el) {
+      const self = this;
+      const result = el;
+      if (result.message === "handshake") {
+        let json=JSON.stringify({"key":"1626945204067","layerId":"37"})
+         self.webSocketOnSend(json);
+      } else if (result.message === "Point") {
+        if (self.bLockEx) {
+          self.bLockEx = false;
+          const format = new GeoJSON();
+          const newFeatures = format.readFeatures(result.data);
+          newFeatures.forEach(function (f) {
+            // const coords = _TransPixel(f.getGeometry().getCoordinates());
+             const coords =f.getGeometry().getCoordinates();
+            const tag = self.TagSource.getFeatureById(f.get("resourceId"));
+            if (tag != null) {
+              if (
+                tag.get("pos_x") - 0.3 > f.get("pos_x") ||
+                tag.get("pos_x") + 0.3 < f.get("pos_x") ||
+                tag.get("pos_y") - 0.3 > f.get("pos_y") ||
+                tag.get("pos_y") + 0.3 < f.get("pos_y")
+              ) {
+                tag.set("pos_x", f.get("pos_x"));
+                tag.set("pos_y", f.get("pos_y"));
+                tag.set("axis", f.get("axis"));
+                tag.getGeometry().setCoordinates(coords);
+                // updateOverPopupPosition(tag, coords);
+              }
+            } else {
+              console.log(f);
+              f.getGeometry().setCoordinates(coords);
+              f.setId(f.get("resourceId"));
+              f.set("visible", true);
+              self.TagSource.addFeature(f);
+              self.options.push({
+                label: f.get("itemname"),
+                value: f.get("resourceId"),
+              });
+            }
+          });
+          self.bLockEx = true;
+        }
+      }
+    },
+
   },
 };
 </script>

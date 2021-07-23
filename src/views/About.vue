@@ -1,6 +1,7 @@
 <template>
   <div class="con-box">
-    <div id="map" class="map" />
+    <span @click="busEmit()">点击是键</span>
+    <!-- <div id="map" class="map" /> -->
   </div>
 </template>
 
@@ -32,7 +33,7 @@ import { OSM, Vector, ImageStatic } from 'ol/source'
 import { defaults as defaultControls } from 'ol/control'
 
 import Draw, { createBox, createRegularPolygon } from 'ol/interaction/Draw'
-
+import bus from '@/util/bus'
 export default {
   data() {
     return {
@@ -49,14 +50,28 @@ export default {
       vlayer: null,
       draw: null,
       source: null,
-      multiSource: null
+      multiSource: null,
+      num:1
     }
   },
   mounted() {
     this.initmap()
   },
 
+beforeDestroy(){
+  console.log('销毁')
+  bus.$off("testbus")
+},
   methods: {
+
+    busEmit(){
+      bus.$emit('testbus',this.addnum())
+    },
+
+    addnum(){
+      return ++this.num
+    },
+
     initmap() {
       // 定义坐标系
       var projection = new Projection({
