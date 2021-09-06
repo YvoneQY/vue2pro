@@ -4,7 +4,9 @@ import router from './router'
 import store from './store'
 import ElementUI from 'element-ui';
 import 'element-ui/lib/theme-chalk/index.css';
+import tcollespet from 'tcollespet'
 Vue.use(ElementUI);
+Vue.use(tcollespet)
 Vue.config.productionTip = false
 
 new Vue({

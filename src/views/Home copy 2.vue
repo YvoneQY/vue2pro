@@ -1,38 +1,6 @@
 <template>
   <div class="openlayer">
     <div>
-          <el-button
-            type="primary"
-            plain
-            icon="el-icon-notebook-1"
-            circle
-            @click="quickStatistics"
-          />
-      <el-collapse v-model="activeNames" @change="collapseChange">
-        <el-collapse-item title="地图围栏" name="1">
-          <el-table
-            :data="tableFence"
-            max-height="200"
-            @select="clickShowFence"
-            @select-all="clickShowCompleteFence"
-          >
-            <el-table-column type="selection" width="30" />
-            <el-table-column prop="fenceName" label="全选" />
-          </el-table>
-        </el-collapse-item>
-        <el-collapse-item title="摄像头" name="2" v-if="tableCamera.length > 0">
-          <el-table
-            :data="tableCamera"
-            max-height="200"
-            @select="clickShowCamera"
-            @select-all="clickShowCompleteCamera"
-          >
-            <el-table-column type="selection" width="30" />
-            <el-table-column prop="cameraName" label="全选" />
-          </el-table>
-        </el-collapse-item>
-      </el-collapse>
-
       <treeselect
         v-model="mapId"
         :max-height="300"
@@ -67,7 +35,6 @@
     </div>
 
     <openlayer-map
-      ref="openmap"
       style="height: 600px"
       :mapurls="mapUrl"
       :curmapconfig="curmap"
@@ -76,29 +43,13 @@
       :icontype="icontypes"
       :draw-form-value="drawFormValue"
       :track-data="trackData"
-      :fence-data="fenceData"
-      :camera-data="cameraData"
-      :play-video-url="playerVideoUrl"
-      :leave-txt="leaveTxt"
       @getTrackData="queryTrackData($event)"
-      @onLeaveTxt="onleaveTxt($event)"
     />
   </div>
 </template>
 
 <script>
-import {   
-  getMap,
-  getMapTree,
-  getHistoryInfoDetail,
-  getLayerFenceDataList,
-  getSingeFence,
-  getAllFence,
-  getCameraLayerList,
-  cameraOne,
-  getSingleCameraGeoJson,
-  getDicts,
-  oneKeyOut,} from "./../util/api";
+import { getMap, getMapTree,getHistoryInfoDetail } from "./../util/api";
 import Treeselect from "@riophae/vue-treeselect";
 // import the styles
 import "@riophae/vue-treeselect/dist/vue-treeselect.css";
@@ -109,11 +60,8 @@ export default {
   components: { Treeselect },
   data() {
     return {
-      leaveTxt: [], //下发撤离文字
-      tableCamera: [],
-      tableFence: [],
-      activeNames: ["1"],
-      trackData: [],
+
+      trackData:[],
       mapList: [],
       drawFormValue: "None",
       colorFlag: 0,
@@ -169,6 +117,7 @@ export default {
         //   unIconFont: 'el-icon-s-promotion'
         // }
       ],
+
       mapId: null,
 
       ws: null,
@@ -441,48 +390,16 @@ export default {
         },
       ],
       icontypes: [],
-      fenceData: [], //围栏数据
-      cameraData: [], //摄像头数据
-      playerVideoUrl: "ws://192.168.3.214:8866/live?url=", //摄像头的ws请求地址
     };
   },
   created() {
     this.getMapList();
-    this.initLeave();
   },
   mounted() {
     this.getIconList();
     this.webSocketPosition();
   },
   methods: {
-    quickStatistics(){
-      this.$refs.openmap.quickStatistics()
-    },
-    //下发文字撤离
-    onleaveTxt(e) {
-      oneKeyOut(e).then((response) => {
-        if (response.code == 200) {
-          console.log("成功了");
-        } else {
-          console.log("失败了", response.data);
-        }
-      });
-    },
-
-    // 获取撤离下发文字
-    initLeave() {
-      getDicts("sys_view_index").then((response) => {
-        if (response.code == 200) {
-          response.data.map((item) => {
-            console.log(item);
-            item.value = item.dictValue;
-            item.label = item.dictLabel;
-          });
-          this.leaveTxt = response.data;
-          console.log("最后文字接口", this.leaveTxt);
-        }
-      });
-    },
     showhaw() {
       this.ishaw = !this.ishaw;
     },
@@ -495,7 +412,6 @@ export default {
     },
     changeMap() {
       let donfig = this.mapData[this.mapIndex];
-
       let dataconfig = {};
       dataconfig.url = donfig.mapPath;
       dataconfig.RealWidth = donfig.mapActualX;
@@ -524,6 +440,7 @@ export default {
         }
       }
       this.icontypes = tagTypes;
+      console.log("文件类型---", this.icontypes);
     },
 
     webSocketPosition() {
@@ -533,11 +450,8 @@ export default {
         register: self.systemID,
       });
       if ("WebSocket" in window) {
-        // self.ws = new WebSocket(
-        //   "ws://192.168.3.214:8080/socket/websocket/socketServer.do"
-        // );
         self.ws = new WebSocket(
-          "ws://192.168.3.92:8762/websocket/socketServer.do"
+          "ws://192.168.3.214:8080/socket/websocket/socketServer.do"
         );
         self.ws.onopen = function () {
           self.webSocketOnSend(param);
@@ -581,13 +495,13 @@ export default {
     getWsPoint() {
       const param = JSON.stringify({
         key: this.systemID,
-        // layerId: this.mapId,
-        layerId: "160",
+        layerId: this.mapId,
       });
       this.webSocketOnSend(param);
     },
 
     handleChange(val, type) {
+      console.log('文件类型哈哈哈',val,type)
       this.colorFlag = val;
       this.drawFormValue = type;
     },
@@ -617,8 +531,7 @@ export default {
     //格式化地图控件
     initMapRule(donfig) {
       let dataconfig = {};
-      dataconfig.mapName = donfig.mapName;
-      dataconfig.idx = donfig.idx;
+      dataconfig.idx=donfig.idx
       dataconfig.url = donfig.mapPath;
       dataconfig.RealWidth = donfig.mapActualX;
       dataconfig.RealHeight = donfig.mapActualY;
@@ -628,96 +541,18 @@ export default {
       dataconfig.ZeroPoint = [donfig.mapOriginX, donfig.mapOriginY];
       dataconfig.param = false;
       this.curmap = dataconfig;
-      this.initFence();
-      this.initCamera();
     },
 
     //获取icon的轨迹数据
-    queryTrackData(e) {
-      console.log(e);
-      getHistoryInfoDetail(e).then((res) => {
-        if (res.code == 200) {
-          this.trackData = res.data;
-        }
-      });
-    },
-    //折叠面板
-    collapseChange(val) {
-      console.log(val);
-    },
-    initFence() {
-      getLayerFenceDataList(this.curmap.idx).then((res) => {
-        if (res.code == 200) {
-          console.log(res.data);
-          this.tableFence = res.data;
-        }
-      });
-    },
-    //初始化摄像头
-    initCamera() {
-      getCameraLayerList(this.curmap.idx).then((res) => {
-        if (res.code == 200) {
-          this.tableCamera = res.data;
-        }
-      });
-    },
-
-    //勾选单个围栏
-    clickShowFence(row) {
-      this.fenceData = [];
-      if (row.length > 0) {
-        row.map((item) => {
-          this.addSingleFence(item.idx);
-        });
-      }
-    },
-    //勾选多个围栏即查所有围栏
-    clickShowCompleteFence(row) {
-      if (row.length == this.tableFence.length) {
-        getAllFence(this.curmap.idx).then((res) => {
-          if (res.code == 200) {
-            this.fenceData = res.data;
+    queryTrackData(e){
+      console.log(e)
+      getHistoryInfoDetail(e).then(res=>{
+          if(res.code==200){
+            this.trackData=res.data
           }
-        });
-      } else {
-        this.fenceData = [];
-      }
-    },
+      })
 
-    //围栏接口调用
-    addSingleFence(value) {
-      getSingeFence(value).then((res) => {
-        if (res.code == 200) {
-          this.fenceData.push(res.data[0]);
-        }
-      });
-    },
-
-    //单选摄像头
-    clickShowCamera(row) {
-      this.cameraData = [];
-      if (row.length > 0) {
-        row.map((item) => {
-          this.addSingleCamera(item.idx);
-        });
-      }
-    },
-    //全选摄像头
-    clickShowCompleteCamera(row) {
-      if (row.length == this.tableFence.length) {
-      } else {
-        this.cameraData = [];
-      }
-    },
-
-    //获取摄像头资源列表
-    addSingleCamera(idx) {
-      getSingleCameraGeoJson(idx).then((res) => {
-        if (res.code == 200) {
-          this.cameraData.push(res.data);
-        }
-      });
-    },
+    }
   },
 };
 </script>

@@ -1,62 +1,54 @@
-import axios from 'axios' // 创建axios实例
-const service = axios.create({
-    // axios中请求配置有baseURL选项，表示请求URL公共部分
-    // baseURL: process.env.VUE_APP_BASE_API,
-     baseURL: 'http://192.168.3.214:2223/',
-    // 超时
-    timeout: 13000
+import axios from 'axios'
+import {
+  Message
+} from 'element-ui'
+
+
+axios.defaults.headers['token'] = '1ae9b3ed27febf8edf80ddf757fa2754'
+// const API_URL= process.env.NODE_ENV==='development'?'http://192.168.9.190:8001/':'/api'
+// const API_URL= process.env.NODE_ENV==='development'?'http://111.231.106.247:8001/':'/api'
+const instances = axios.create({
+  // baseURL: 'http://192.168.3.121:8002/',
+  // baseURL: 'http://192.168.3.214:2223/',
+  baseURL: process.env.VUE_APP_BASE_API,
+  timeout: 8000,
+  withCredentials: false
 })
+// 请求拦截器
+instances.interceptors.request.use(request => {
+  request.headers['Authorization'] = 'Bearer afa5997a-3666-458a-a71c-8f5ca2e4c28c'
+  request.headers['Accept-Language'] = 'zh-CN,zh'
+  // if (request.method == 'post') {
+  //   // request.data=Encrypt(JSON.stringify(request.data))
+  //   // const jiami11 = Encrypt(JSON.stringify(request.data))
+  //   // console.log('加密后的post', request.data, jiami11)
+  // }
 
-// request拦截器
-service.interceptors.request.use(config => {
-    // 是否需要设置 token
-    // const isToken = (config.headers || {}).isToken === false
-    // if (getToken() && !isToken) {
-    //   config.headers['Authorization'] = 'Bearer ' + getToken() // 让每个请求携带自定义token 请根据实际情况自行修改
-    //   switch (Cookie.get('langs')) {
-    //     case 'zh':
-    //       config.headers['Accept-Language'] = 'zh-CN,zh'// 让每个请求携带自定义token 请根据实际情况自行修改
-    //       break
-    //     case 'en':
-    //       config.headers['Accept-Language'] = 'en-US,en'// 让每个请求携带自定义token 请根据实际情况自行修改
-    //       break
-    //     case 'tw':
-    //       config.headers['Accept-Language'] = 'zh-TW,zh'// 让每个请求携带自定义token 请根据实际情况自行修改
-    //       break
-    //   }
-    return config
+  return request
+}, error => {
+  return Promise.reject(error)
 })
-
-
-
-// 响应拦截器
-service.interceptors.response.use(res => {
-        // 未设置状态码则默认成功状态
-        const code = res.data.code || 200
-
-        if (code === 400) {
-            return res.data
-        } else if (code !== 200) {
-
-            return Promise.reject('error')
-        } else {
-            return res.data
+// 相应拦截器
+instances.interceptors.response.use(response => {
+  // 解密处理
+  if (typeof (response.data) === 'string') {
+    return Promise.resolve(response.data)
+  } else {
+    // 正常接口调用
+    if (response.status == 200) {
+      if (response.data.ret === 'ERROR') {
+        if (response.data.msg != '无效文献id!') {
+          Message.info(response.data.msg)
         }
-    },
-    error => {
-        console.log('err' + error)
-        let {
-            message
-        } = error
-        if (message == 'Network Error') {
-            message = '后端接口连接异常'
-        } else if (message.includes('timeout')) {
-            message = '系统接口请求超时'
-        } else if (message.includes('Request failed with status code')) {
-            message = '系统接口' + message.substr(message.length - 3) + '异常'
-        }
-        return Promise.reject(error)
+      }
+      return Promise.resolve(response.data)
+    } else {
+      return Promise.reject(Response)
     }
-)
+  }
+}, error => {
+  Message.warning('请求超时,请稍后再试', error)
+  return Promise.reject(error)
+})
 
-export default service
+export default instances
