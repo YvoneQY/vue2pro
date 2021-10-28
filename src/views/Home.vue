@@ -20,7 +20,7 @@
             <el-table-column prop="fenceName" label="全选" />
           </el-table>
         </el-collapse-item>
-        <el-collapse-item title="摄像头" name="2" v-if="tableCamera.length > 0">
+        <el-collapse-item title="摄像头显示" name="2" v-if="tableCamera.length > 0">
           <el-table
             :data="tableCamera"
             max-height="200"
