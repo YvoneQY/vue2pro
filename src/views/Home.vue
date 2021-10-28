@@ -607,7 +607,7 @@ export default {
         if (res.code == 200) {
           let RES = res.data;
           if (RES != undefined) {
-            RES.mapPath = "http://192.168.3.214:8080" + "/file" + RES.mapPath;
+            RES.mapPath = "http://192.168.11.214:8080" + "/file" + RES.mapPath;
             this.initMapRule(RES);
           }
           this.getWsPoint();
