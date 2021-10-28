@@ -9,7 +9,7 @@
             @click="quickStatistics"
           />
       <el-collapse v-model="activeNames" @change="collapseChange">
-        <el-collapse-item title="地图围栏" name="1">
+        <el-collapse-item title="地图管理模式" name="1">
           <el-table
             :data="tableFence"
             max-height="200"
