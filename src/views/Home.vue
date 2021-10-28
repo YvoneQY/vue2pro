@@ -9,7 +9,7 @@
             @click="quickStatistics"
           />
       <el-collapse v-model="activeNames" @change="collapseChange">
-        <el-collapse-item title="地图管理模式" name="1">
+        <el-collapse-item title="地图管式" name="1">
           <el-table
             :data="tableFence"
             max-height="200"
@@ -20,7 +20,7 @@
             <el-table-column prop="fenceName" label="全选" />
           </el-table>
         </el-collapse-item>
-        <el-collapse-item title="摄像头显示1" name="2" v-if="tableCamera.length > 0">
+        <el-collapse-item title="摄像示1" name="2" v-if="tableCamera.length > 0">
           <el-table
             :data="tableCamera"
             max-height="200"
