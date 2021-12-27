@@ -1,0 +1,15 @@
+var SERVER_URL = window.location.protocol + "//" + window.location.host;
+var WROKSPACE_NAME = "vrgv";
+var DATA_SCHEMA = "commondata";
+var MAP_LAYER = 'map-vrgv';
+// var DATA_SCHEMA = "area_j_indoor";
+// var MAP_LAYER = 'HWJQ-map';
+var MAP_CENTER = [38.86073, 121.50932];
+var LOC_ENV = 'IVAS';
+var LOC_B_KEY = 'ivasproductionbuildingid';
+var LOC_F_KEY = 'ivasfloorid';
+//var ACCESS_TOKEN = '51deff69-c512-449e-860e-aad1d84addfa';
+// var SERVER_URL_SERVICE = "map-service"
+// var SERVER_URL_MAP = "services/map-service"
+// var CLIENT_ID = '6Wxgmm0WpGQDGyoyTsILeCZr'
+// var CLIENT_SECRET = 'jyPPHjhR4wstOnyQGQMralVNRW9PBgxR'
