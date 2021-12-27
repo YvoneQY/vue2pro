@@ -14,7 +14,7 @@
       />
     </el-select>
     <div @click="addStar()">添加</div>
-    <div @click="localpos()">定位88888888888888指定</div>
+    <div @click="localpos()">定位指定</div>
     <div @click="localpos1()">定位指定1</div>
     <div @click="localpos2()">定位指定2</div>
     <div id="map" class="map" />
