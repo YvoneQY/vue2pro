@@ -7,17 +7,22 @@ Vue.use(VueRouter)
 const routes = [
   {
     path:'/',
-    redirect:'/set'
+    redirect:'/3d'
   },
   {
     path: '/home',
     name: 'Home',
-    component: Home
+    component: ()=>import('../views/Info.vue')
   },
   {
     path: '/set',
     name: 'Set',
     component: Set
+  },
+  {
+    path: '/3d',
+    name: 'Three',
+    component: ()=>import('../views/Three/ThreeEX.vue')
   },
   {
     path: '/about',

@@ -1,10 +1,10 @@
 <template>
   <div id="app">
     <div id="nav">
-      今天一天都不会有所输出；
-    <router-link to="/">测试测试</router-link> |
-      <router-link to="/">Home</router-link> |
+    <router-link to="/">测试</router-link> |
+      <router-link to="/home">Home</router-link> |
       <router-link to="/about">About</router-link>
+      <router-link to="/3d">/3d</router-link>
     </div>
     <router-view/>
   </div>
