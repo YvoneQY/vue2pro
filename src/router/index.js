@@ -7,12 +7,17 @@ Vue.use(VueRouter)
 const routes = [
   {
     path:'/',
-    redirect:'/3d'
+    redirect:'/home'
   },
   {
     path: '/home',
     name: 'Home',
-    component: ()=>import('../views/Info.vue')
+    component: ()=>import('../views/Home.vue')
+  },
+  {
+    path: '/grati',
+    name: 'grati',
+    component: ()=>import('../views/grati.vue')
   },
   {
     path: '/set',
@@ -23,6 +28,26 @@ const routes = [
     path: '/3d',
     name: 'Three',
     component: ()=>import('../views/Three/ThreeEX.vue')
+  },
+  {
+    path: '/plane',
+    name: 'plane',
+    component: ()=>import('../views/plane/index.vue')
+  },
+  {
+    path: '/heatmap',
+    name: 'heatmap',
+    component: ()=>import('../views/heatmap/index.vue')
+  },
+  {
+    path: '/cluster',
+    name: 'cluster',
+    component: ()=>import('../views/cluster/cluster.vue')
+  },
+  {
+    path: '/cluster1',
+    name: 'cluster',
+    component: ()=>import('../views/cluster/draw.vue')
   },
   {
     path: '/about',

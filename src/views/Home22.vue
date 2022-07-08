@@ -49,7 +49,7 @@
 </template>
 
 <script>
-import { getMap, getMapTree,getHistoryInfoDetail } from "./../util/api";
+import { getMap, getMapTree,getHistoryInfoDetail } from "../util/api";
 import Treeselect from "@riophae/vue-treeselect";
 // import the styles
 import "@riophae/vue-treeselect/dist/vue-treeselect.css";

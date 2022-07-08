@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="simple">
-      <div>简单的</div>
+      <div>简单的{{ checkedId }}</div>
       <treeselect v-model="value" :multiple="true" :options="options" />
     </div>
     <div class="complicated">
@@ -15,27 +15,78 @@
         :to_data="toData"
         :defaultProps="{ label: 'label' }"
         default-transfer
-        @addBtn="adda"
-        @removeBtn="removea"
+        @add-btn="add"
+        @remove-btn="remove"
         :mode="mode"
-    
+
         filter
         openAll
         @left-check-change="changeLeft"
         @right-check-change="changeRight"
       >
-        <!-- @left-check-change="changeLeft"
-        @right-check-change="changeRight" -->
       </tree-transfer>
+      <br />
+      <tree-transfer
+        lazy
+        @lazyFn="lazyLoad"
+        :title="title"
+        :data="dataList"
+        node-key="id"
+        :defaultProps="{ label: 'label' }"
+        default-transfer
+        @add-btn="add"
+        @remove-btn="remove"
+        :mode="mode"
+        @left-check-change="changeLeft"
+        @right-check-change="changeRight"
+      >
+      </tree-transfer>
+       <!-- <tree-transfer
+        lazy
+        @lazyFn="lazyLoad"
+        :title="title"
+        :from_data="fromData11"
+        node-key="id"
+        :to_data="toData11"
+        :defaultProps="{ label: 'label' }"
+        default-transfer
+        @add-btn="add"
+        @remove-btn="remove"
+        :mode="mode"
+        height="540px"
+        @left-check-change="changeLeft"
+        @right-check-change="changeRight"
+      >
+      </tree-transfer> -->
+      <!-- <tree-transfer
+        ref="pageTree"
+        :title="title"
+        :default-checked-keys="defaultCheckedPeople1"
+        :from_data="fromData1"
+        node-key="id"
+        :to_data="toData1"
+        :defaultProps="{ label: 'label' }"
+        default-transfer
+        @add-btn="add"
+        @remove-btn="remove"
+        :mode="mode"
+        height="540px"
+        filter
+        openAll
+        @left-check-change="changeLeft"
+        @right-check-change="changeRight"
+      >
+      </tree-transfer> -->
     </div>
   </div>
 </template>
 
 <script>
+
 import Treeselect from "@riophae/vue-treeselect";
 import treeTransfer from "el-tree-transfer";
 import "@riophae/vue-treeselect/dist/vue-treeselect.css";
-import { deptList } from './dept.js';
+import { deptList } from "./dept.js";
 export default {
   components: {
     Treeselect,
@@ -131,18 +182,144 @@ export default {
       //   },
       // ],
       toData: [],
-      fromData:deptList,
+      fromData: deptList,
       defaultCheckedPeople: [],
       // defaultCheckedPeople: [203, 211],
-      deptData:[]
+      deptData: [],
+      checkedId: [],
+
+      curData: [],
+
+      fromData1: [
+        {
+          id: "1",
+          pid: 0,
+          label: "一级 1",
+          children: [
+            {
+              id: "1-1",
+              pid: "1",
+              label: "二级 1-1",
+              disabled: true,
+              children: [],
+            },
+            {
+              id: "1-2",
+              pid: "1",
+              label: "二级 1-2",
+              children: [
+                {
+                  id: "1-2-1",
+                  pid: "1-2",
+                  children: [],
+                  label: "二级 1-2-1",
+                },
+                {
+                  id: "1-2-2",
+                  pid: "1-2",
+                  children: [],
+                  label: "二级 1-2-2",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      toData1: [],
+      defaultCheckedPeople1: [],
+
+      fromData11: [
+        {
+          id: "1",
+          pid: 0,
+          label: "一级 1",
+          children: [
+            {
+              id: "1-1",
+              pid: "1",
+              label: "二级 1-1",
+              disabled: true,
+              children: [],
+            },
+            {
+              id: "1-2",
+              pid: "1",
+              label: "二级 1-2",
+              children: [
+                {
+                  id: "1-2-1",
+                  pid: "1-2",
+                  children: [],
+                  label: "二级 1-2-1",
+                },
+                {
+                  id: "1-2-2",
+                  pid: "1-2",
+                  children: [],
+                  label: "二级 1-2-2",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      toData11: [],
+      defaultCheckedPeople11: [],
+      dataList:[
+           {
+          id: "1",
+          pid: 0,
+          label: "一级 1",
+          children: [
+            {
+              id: "1-1",
+              pid: "1",
+              label: "二级 1-1",
+              disabled: true,
+              children: [],
+            },
+            {
+              id: "1-2",
+              pid: "1",
+              label: "二级 1-2",
+              children: [
+                {
+                  id: "1-2-1",
+                  pid: "1-2",
+                  children: [],
+                  label: "二级 1-2-1",
+                },
+                {
+                  id: "1-2-2",
+                  pid: "1-2",
+                  children: [],
+                  label: "二级 1-2-2",
+                },
+              ],
+            },
+          ],
+        },
+      ]
     };
   },
   mounted() {
     this.$nextTick(() => {
       console.log("眼睛疼", this.$refs.pageTree);
     });
+
   },
   methods: {
+
+    lazyLoad(node, resolve, from){
+      //  node->当前展开节点node
+      // resolve->懒加载resolve 
+      // from -> left/right 表示回调来自左侧/右侧
+      console.log('你好---',node, resolve, from)
+      setTimeout(() => {
+          resolve(this.dataList)
+      }, 1000);
+
+    },
     // 切换模式 现有树形穿梭框模式transfer 和通讯录模式addressList
     changeMode() {
       if (this.mode == "transfer") {
@@ -152,7 +329,7 @@ export default {
       }
     },
     // 监听穿梭框组件添加
-    adda(fromData, toData, obj) {
+    add(fromData, toData, obj) {
       // 树形穿梭框模式transfer时，返回参数为左侧树移动后数据、右侧树移动后数据、移动的{keys,nodes,halfKeys,halfNodes}对象
       // 通讯录模式addressList时，返回参数为右侧收件人列表、右侧抄送人列表、右侧密送人列表
       console.log("fromData:", fromData);
@@ -160,7 +337,7 @@ export default {
       console.log("obj:", obj);
     },
     // 监听穿梭框组件移除
-    removea(fromData, toData, obj) {
+    remove(fromData, toData, obj) {
       // 树形穿梭框模式transfer时，返回参数为左侧树移动后数据、右侧树移动后数据、移动的{keys,nodes,halfKeys,halfNodes}对象
       // 通讯录模式addressList时，返回参数为右侧收件人列表、右侧抄送人列表、右侧密送人列表
       console.log("fromData:", fromData);
@@ -170,10 +347,10 @@ export default {
 
     changeLeft(nodeObj, treeObj, checkAll) {
       console.log("左侧--", nodeObj, treeObj, checkAll);
+      this.checkedId = treeObj.checkedKeys;
       // treeObj.checkedKeys.map(item=>{
       //    this.defaultCheckedPeople.push(item)
       // })
-     
     },
     changeRight(nodeObj, treeObj, checkAll) {
       console.log("右侧--", nodeObj, treeObj, checkAll);

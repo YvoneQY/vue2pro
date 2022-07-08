@@ -1,14 +1,17 @@
 <template>
   <div id="app">
-    <div id="nav">
-    <router-link to="/">测试</router-link> |
-      <router-link to="/home">Home</router-link> |
-      <router-link to="/about">About</router-link>
-      <router-link to="/3d">/3d</router-link>
-    </div>
-    <router-view/>
+    <router-view />
   </div>
 </template>
+<script>
+export default {
+  data() {
+    return {
+    };
+  },
+};
+</script>
+
 
 <style lang="scss">
 #app {

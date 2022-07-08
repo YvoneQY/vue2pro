@@ -1,286 +1,91 @@
 <template>
-  <div class="con-box">
-    <div id="map" class="map" />
+  <div>
+   <tree-el default-props="defaultProps" :target-data="toData" :source-data="deptData"></tree-el>
   </div>
 </template>
 
 <script>
-import "ol/ol.css";
-import olMap from "ol/Map";
-import olView from "ol/View";
-import ollayerTile from "ol/layer/Tile";
-// import olsourceOSM from "ol/source/OSM";
-import { get as getProjection, Projection, fromLonLat } from "ol/proj";
-import VectorLayer from "ol/layer/Vector";
-import VectorSource from "ol/source/Vector";
-import { Point, LineString, Polygon } from "ol/geom";
-import XYZ from "ol/source/XYZ";
-import { Map, View, Feature, ol } from "ol";
-
-import {
-  Circle,
-  Fill,
-  Stroke,
-  Style,
-  Text,
-  Icon,
-  Circle as CircleStyle,
-} from "ol/style.js";
-import Overlay from "ol/Overlay.js";
-import { Image } from "ol/layer.js";
-import { OSM, Vector, ImageStatic } from "ol/source";
-import { defaults as defaultControls } from "ol/control";
-import {
-  getCenter
-} from 'ol/extent'
-import Draw, { createBox, createRegularPolygon } from "ol/interaction/Draw";
-import bus from "@/util/bus";
-import echarts from 'echarts'
+import { deptList } from "./dept.js";
+import treeEl from './treeEl'
 export default {
+  components:{
+    treeEl
+  },
   data() {
     return {
-      value: "",
-      map: null,
-      view: null,
-      positionLayer: null,
-      featuresArr: [],
-      opt: {
-        img: "",
-        imgsize: "",
+      deptData: deptList,
+      filterText: "",
+      filterRight: "",
+      fromData: [
+        {
+          id: 1,
+          label: "一级 1",
+          children: [
+            {
+              id: 4,
+              label: "二级 1-1",
+              children: [
+                {
+                  id: 9,
+                  label: "三级 1-1-1",
+                },
+                {
+                  id: 10,
+                  label: "三级 1-1-2",
+                },
+              ],
+            },
+          ],
+        },
+        {
+          id: 2,
+          label: "一级 2",
+          children: [
+            {
+              id: 5,
+              label: "二级 2-1",
+            },
+            {
+              id: 6,
+              label: "二级 2-2",
+            },
+          ],
+        },
+        {
+          id: 3,
+          label: "一级 3",
+          children: [
+            {
+              id: 7,
+              label: "二级 3-1",
+            },
+            {
+              id: 8,
+              label: "二级 3-2",
+            },
+          ],
+        },
+      ],
+      toData: [],
+      defaultProps: {
+        children: "children",
+        label: "label",
       },
-      geo: null,
-      vlayer: null,
-      draw: null,
-      source: null,
-      multiSource: null,
-      num: 1,
-
-      echarMain:null,
-      iextend:[-1685.7743097238895, -1944.0708283313325, 3931.2256902761105, 2022.9291716686675]
     };
   },
-  mounted() {
-    this.initmap();
-    // console.log('echarts=',echarts,this.$refs.main)
-    // this.echarMain=echarts.init(this.$refs.main)
-    // this.echarMain.setOption(this.option)
-  },
-
-  beforeDestroy() {},
+ 
   methods: {
-    addnum() {
-      return ++this.num;
-    },
-
-    initmap() {
-      // 定义坐标系
-      var projection = new Projection({
-        // code: "EPSG:900931", // 用“米”做单位的x/y坐标的投影
-        code: "xkcd-image",
-        units: "pixels", // 单位：像素
-         extent: [-400,0, 1200, 300], // 图片图层四至,分别是静态图片左下角和右上角的基于基站的坐标
-        // extent:this.iextend
-      });
-      this.view = new olView({
-        center: getCenter([-400,0, 1200, 300]),
-        projection: projection,
-        zoom: 2,
-      });
-
-      var imageLayer = new Image({
-        source: new ImageStatic({
-          //   url: require('../../../public/image/wb.png'),
-          url: "https://scpic.chinaz.net/files/pic/pic9/202102/hpic3599.jpg",
-          // imageSize: [1300, 980], // 图片尺寸（px）  [长,宽]
-          projection: projection,
-          imageExtent: [-400,10, 1200, 300], // // 映射到地图的范围
-          // imageExtent:this.iextend
-        }),
-        style: new Style({
-          fill: new Fill({
-            color: "rgba(255, 255, 255, 0.2",
-          }),
-          stroke: new Stroke({
-            color: "#ffcc33",
-            width: 2,
-          }),
-          image: new Icon({
-            // src: '../../../../public/static/icon/5ren.png',
-            src: require("../../public/static/icon/5ren.png"),
-            anchor: [0.5, 1],
-            // src: 'https://openlayers.org/en/v4.6.5/examples/data/icon.png'
-          }),
-        }),
-      });
-
-      this.source = new VectorSource({ wrapX: false });
-
-      var vector = new VectorLayer({
-        source: this.source,
-      });
-
-      this.map = new olMap({
-        target: "map",
-        controls: defaultControls({
-          zoom: true,
-        }).extend([]),
-        layers: [imageLayer, vector],
-        view: this.view,
-      });
-
-      this.addIcon();
-      this.drawShap();
-    },
-
-    drawShap(){
-        this.map.addInteraction(new Draw({
-            source:this.source,
-            type:'Polygon'
-        }))
-    },
-
-    addIcon() {
-      var iconFeature = new Feature(new Point([0, 0]));
-      iconFeature.set("style", this.createStyle("data/icon.png", undefined));
-
-      var iconFeature1 = new Feature(new Point([60, 0]));
-      iconFeature1.set("style", this.createStyle("data/icon.png", undefined));
-
-      var iconFeature5 = new Feature(new Point([160, 100]));
-      iconFeature5.set(
-        "style",
-        new Style({
-          image: new Icon({
-            anchor: [0.5, 1],
-            src: require("../../public/static/icon/5ren.png"),
-            // src: require('../../../../public/image/5ren.png'),
-            color: "#f00",
-            rotation: Math.PI / 4,
-          }),
-          text: new Text({
-            text: "锚点显示111",
-            scale: [1, 1],
-            textAlign: "center",
-            color: "#f00",
-            textBaseline: "top",
-          }),
-        })
-      );
-
-      this.multiSource = new VectorSource({
-        features: [iconFeature, iconFeature1],
-      });
-      this.multiSource.addFeature(iconFeature5);
-      this.vlayer = new VectorLayer({
-        style: function (feature) {
-          return feature.get("style");
-        },
-        source: this.multiSource,
-      });
-
-      this.map.addLayer(this.vlayer);
-    },
-
-    // 创建简单的icon
-    createStyle(src, img) {
-      return new Style({
-        image: new Icon({
-          // anchor: [0.5, 0.96],
-          anchor: [0.5, 1],
-          src: require("../../public/static/icon/5ren.png"),
-          //   src: require('/static/icon/5ren.png'),
-          img: img,
-          color: "#f00",
-          rotation: Math.PI / 4,
-          // imgSize: img ? [img.width, img.height] : undefined,
-        }),
-        text: new Text({
-          text: "锚点",
-          scale: [1, 1],
-          textAlign: "center",
-          color: "#f00",
-          textBaseline: "top",
-        }),
-      });
-    },
-
-    FenceStyle(f, r) {
-      return [
-        new Style({
-          fill: new Fill({
-            color: "rgba(" + r + ",0.1)",
-          }),
-          stroke: new Stroke({
-            lineDash: [1, 2, 3, 4, 5, 6],
-            color: "rgb(" + r + ")",
-            width: 2,
-          }),
-          image: new Circle({
-            radius: 7,
-            fill: new Fill({
-              color: "#FF0000",
-            }),
-          }),
-          text: new Text({
-            text: f.get("name"),
-            font: "bold 14px Arial",
-            textAlign: "center",
-            textBaseline: "middle",
-            offsetX: 0,
-            offsetY: 0,
-            fill: new Fill({
-              color: "#FF0000",
-            }),
-            stroke: new Stroke({
-              color: "#fff",
-              width: 3,
-            }),
-          }),
-        }),
-      ];
-    },
+  
   },
 };
 </script>
 
 <style scoped>
-#map {
-  width: 97%;
-  margin: 0 auto;
-  /* background: rgb(238, 238, 238); */
+.eltransfer {
+  display: flex;
 }
-.con-box {
-  width: 100%;
-
-  border: 1px solid #999999;
-}
-.map {
-  height: 400px;
-  border: 1px solid;
-}
-.icon_but {
-  margin: 0 10px;
-  padding: 10px;
+.transfer {
+  width: 300px;
   border: 1px solid red;
-}
-.toolbar {
-  margin: 10px;
-}
-.toolbar span {
-  display: inline-block;
-}
-
-.ol-popup {
-  border: 1px solid red;
-  font-size: 20px;
-  font-weight: bolder;
-}
-.con-box>.main{
-  border: 1px solid red;
-}
-.con-box {
-  width: 100%;
-
-  border: 1px solid #999999;
 }
 </style>

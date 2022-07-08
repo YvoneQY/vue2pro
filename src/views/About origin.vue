@@ -6,8 +6,6 @@
       <el-button @click="setCheckedNodes">通过 node 设置</el-button>
       <el-button @click="setCheckedKeys">通过 key 设置</el-button>
       <el-button @click="resetChecked">清空</el-button>
-      <el-button @click="leftMove">左移动</el-button>
-      <el-button @click="rightMove">右移动</el-button>
     </div>
     <div class="eltransfer">
       <div class="transfer el-left">
@@ -21,10 +19,7 @@
           ref="fromtree"
           highlight-current
           :filter-node-method="filterNode"
-        
           :props="defaultProps"
-          @check-change="handleCheckChange"
-           @node-click="departmentNodeClick"   
         >
         </el-tree>
       </div>
@@ -36,27 +31,10 @@
           show-checkbox
           default-expand-all
           node-key="id"
-          ref="totree"
-          :default-checked-keys="toCheckDefault"
+          ref="tree"
           highlight-current
           :props="defaultProps"
           :filter-node-method="filterNodeRight"
-        >
-        </el-tree>
-      </div>
-    </div>
-    <div>
-      <div class="transfer el-right">
-        <el-input placeholder="输入关键字进行过滤" v-model="filterRight">
-        </el-input>
-        <el-tree
-          :data="deptData"
-          show-checkbox
-          default-expand-all
-          node-key="id"
-          ref="totree"
-          highlight-current
-          :props="defaultProps"
         >
         </el-tree>
       </div>
@@ -65,14 +43,11 @@
 </template>
 
 <script>
-import { deptList } from "./dept.js";
 export default {
   data() {
     return {
-      toDefault:[],
-      deptData: deptList,
       filterText: "",
-      filterRight: "",
+      filterRight:"",
       fromData: [
         {
           id: 1,
@@ -132,29 +107,10 @@ export default {
   },
   watch: {
     filterText(val) {
-      this.$refs.fromtree.filter(val);
-    },
-    filterRight(val) {
-      this.$refs.totree.filter(val);
+      this.$refs.tree.filter(val);
     },
   },
   methods: {
-
-    departmentNodeClick(data){
-      console.log('查看---',data)
-
-    },
-    handleCheckChange(data, checked, indeterminate) {
-      // console.log(data, checked, indeterminate);
-    },
-    handleNodeClick(data) {
-      console.log("选中数据", data);
-    },
-    handleNodeClick(data) {
-      console.log("勾选数据", data);
-    },
-    leftMove() {},
-    rightMove() {},
     filterNodeRight(value, data) {
       if (!value) return true;
       return data.label.indexOf(value) !== -1;
@@ -164,40 +120,28 @@ export default {
       return data.label.indexOf(value) !== -1;
     },
     getCheckedNodes() {
-      console.log(this.$refs.fromtree.getCheckedNodes());
+      console.log(this.$refs.tree.getCheckedNodes());
     },
     getCheckedKeys() {
-      console.log(this.$refs.fromtree.getCheckedKeys());
+      console.log(this.$refs.tree.getCheckedKeys());
     },
     setCheckedNodes() {
-      // this.$refs.fromtree.setCheckedNodes([
-      //   {
-      //     id: 5,
-      //     label: "二级 2-1",
-      //   },
-      //   {
-      //     id: 9,
-      //     label: "三级 1-1-1",
-      //   },
-      // ]);
-      console.log(
-        "弄得222",
-        this.$refs.fromtree.getCheckedKeys(),
-        this.$refs.fromtree.getCheckedNodes()
-      );
+      this.$refs.tree.setCheckedNodes([
+        {
+          id: 5,
+          label: "二级 2-1",
+        },
+        {
+          id: 9,
+          label: "三级 1-1-1",
+        },
+      ]);
     },
     setCheckedKeys() {
-      // this.$refs.fromtree.setCheckedKeys([3]);
-      console.log(
-        "弄得333",
-        this.$refs.fromtree.getCheckedKeys(),
-        this.$refs.fromtree.getCheckedNodes(),
-        this.$refs.fromtree.getCurrentNode(),
-        this.$refs.fromtree.getCurrentKey()
-      );
+      this.$refs.tree.setCheckedKeys([3]);
     },
     resetChecked() {
-      this.$refs.fromtree.setCheckedKeys([]);
+      this.$refs.tree.setCheckedKeys([]);
     },
   },
 };

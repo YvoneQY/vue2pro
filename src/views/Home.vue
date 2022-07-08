@@ -1,529 +1,586 @@
 <template>
-  <div class="openlayer">
-    <div>
-          <el-button
-            type="primary"
-            plain
-            icon="el-icon-notebook-1"
-            circle
-            @click="quickStatistics"
-          />
-      <el-collapse v-model="activeNames" @change="collapseChange">
-        <el-collapse-item title="地图管式" name="1">
-          <el-table
-            :data="tableFence"
-            max-height="200"
-            @select="clickShowFence"
-            @select-all="clickShowCompleteFence"
-          >
-            <el-table-column type="selection" width="30" />
-            <el-table-column prop="fenceName" label="全选" />
-          </el-table>
-        </el-collapse-item>
-        <el-collapse-item title="摄像示1" name="2" v-if="tableCamera.length > 0">
-          <el-table
-            :data="tableCamera"
-            max-height="200"
-            @select="clickShowCamera"
-            @select-all="clickShowCompleteCamera"
-          >
-            <el-table-column type="selection" width="30" />
-            <el-table-column prop="cameraName" label="全选" />
-          </el-table>
-        </el-collapse-item>
-      </el-collapse>
-
-      <treeselect
-        v-model="mapId"
-        :max-height="300"
-        :options="mapList"
-        style="float: left; width: 200px"
-        @input="nodeClick"
+  <div class="con-box">
+    <el-select
+      v-model="value"
+      clearable
+      placeholder="请选择"
+      @change="changeType"
+    >
+      <el-option
+        v-for="item in options"
+        :key="item.value"
+        :label="item.label"
+        :value="item.value"
       />
-      <!-- <el-tooltip
-        v-for="(item, index) in drawForms"
-        :key="index"
-        effect="dark"
-        :content="item.label"
-        placement="bottom"
-      >
-        <el-button
-          :key="item.value"
-          type="text"
-          :autofocus="false"
-          :data-id="item.value"
-          :label="item.label"
-          :disabled="disabled"
-          size="mini"
-          @click="handleChange(index, item.value)"
-        >
-          {{ item.id == colorFlag ? "un" + item.label : item.label }}
-        </el-button>
-      </el-tooltip> -->
-      <el-button @click="changePic">点我切图</el-button>
-      <el-button @click="showhaw">是否显示鹰眼</el-button>
-      <el-button @click="changeMap">重新渲染map</el-button>
-      <el-button @click="getWsPoint">获取ws动态点</el-button>
-    </div>
+    </el-select>
+    <div @click="addStar()">添加</div>
+    <div @click="onEdit()">编辑了</div>
+    <div @click="localpos()">定位指定</div>
+    <div @click="localpos1()">定位指定1</div>
+    <div @click="localpos2()">定位指定2</div>
+    <div id="map" class="map" />
 
-    <openlayer-map
-      ref="openmap"
-      style="height: 600px"
-      :mapurls="mapUrl"
-      :curmapconfig="curmap"
-      :is-haw-eyes="ishaw"
-      :wsmsgdata="wsMsg"
-      :icontype="icontypes"
-      :draw-form-value="drawFormValue"
-      :track-data="trackData"
-      :fence-data="fenceData"
-      :camera-data="cameraData"
-      :play-video-url="playerVideoUrl"
-      :leave-txt="leaveTxt"
-      @getTrackData="queryTrackData($event)"
-      @onLeaveTxt="onleaveTxt($event)"
-    />
+    <!-- <div
+      class="popup-info-div"
+      style="height：100px;width:100px;border:1px solid red;display:none"
+    >
+      <div id="popup-info" class="ol-popup">
+        <a href="#" id="popup-closer" class="ol-popup-closer">close</a>
+        <div id="popup-title" class="popup-title"></div>
+        <div id="popup-content"></div>
+      </div>
+    </div> -->
   </div>
 </template>
 
 <script>
-import {   
-  getMap,
-  getMapTree,
-  getHistoryInfoDetail,
-  getLayerFenceDataList,
-  getSingeFence,
-  getAllFence,
-  getCameraLayerList,
-  cameraOne,
-  getSingleCameraGeoJson,
-  getDicts,
-  oneKeyOut,} from "./../util/api";
-import Treeselect from "@riophae/vue-treeselect";
-// import the styles
-import "@riophae/vue-treeselect/dist/vue-treeselect.css";
-
 import "ol/ol.css";
-// import OpenlayerMap from "@/components/OpenlayerMap.vue";
+import olMap from "ol/Map";
+import olView from "ol/View";
+import ollayerTile from "ol/layer/Tile";
+// import olsourceOSM from "ol/source/OSM";
+import { get as getProjection, Projection, fromLonLat } from "ol/proj";
+import VectorLayer from "ol/layer/Vector";
+import VectorSource from "ol/source/Vector";
+import { Point, LineString, Polygon } from "ol/geom";
+import XYZ from "ol/source/XYZ";
+import { Map, View, Feature, ol } from "ol";
+
+import {
+  Circle,
+  Fill,
+  Stroke,
+  Style,
+  Text,
+  Icon,
+  Circle as CircleStyle,
+  RegularShape,
+} from "ol/style.js";
+import Overlay from "ol/Overlay.js";
+import { Image } from "ol/layer.js";
+import { OSM, Vector, ImageStatic } from "ol/source";
+import { defaults as defaultControls } from "ol/control";
+import { GeoJSON } from "ol/format.js";
+import Draw, { createBox, createRegularPolygon } from "ol/interaction/Draw";
+import bus from "@/util/bus";
+import ExtTransform from "ol-ext/interaction/Transform";
+
 export default {
-  components: { Treeselect },
   data() {
     return {
-      leaveTxt: [], //下发撤离文字
-      tableCamera: [],
-      tableFence: [],
-      activeNames: ["1"],
-      trackData: [],
-      mapList: [],
-      drawFormValue: "None",
-      colorFlag: 0,
-      disabled: false,
-      drawForms: [
+      options: [
         {
-          id: 0,
           value: "None",
-          label: "无操作",
-          iconFont: "al-icon-carxuanzegongju1",
-          unIconFont: "al-icon-carxuanzegongju",
+          label: "None",
         },
         {
-          id: 1,
-          value: "Box",
-          label: "绘制矩形",
-          iconFont: "al-icon-carcheckbox-blank-outli",
-          unIconFont: "al-icon-carcheckbox-blank",
-        },
-        {
-          id: 2,
-          value: "Square",
-          label: "绘制方块",
-          iconFont: "al-icon-carrhombus-outline",
-          unIconFont: "al-icon-carrhombus",
-        },
-        {
-          id: 3,
-          value: "Polygon",
-          label: "绘制多边形",
-          iconFont: "al-icon-carpentagon-outline",
-          unIconFont: "al-icon-carpentagon",
-        },
-        {
-          id: 4,
           value: "Circle",
-          label: "绘制圆形",
-          iconFont: "al-icon-carcheckbox-blank-circle-outline",
-          unIconFont: "al-icon-carcheckbox-blank-circle",
+          label: "Circle",
         },
         {
-          id: 5,
-          value: "Select",
-          label: "修改围栏",
-          iconFont: "al-icon-carbianji-kong",
-          unIconFont: "al-icon-carbianji-shi",
+          value: "Square",
+          label: "Square",
         },
-        // {
-        //   id: 6,
-        //   value: 'BiaoChi',
-        //   label: '标尺',
-        //   iconFont: 'el-icon-position',
-        //   unIconFont: 'el-icon-s-promotion'
-        // }
+        {
+          value: "Box",
+          label: "Box",
+        },
+        {
+          value: "Star",
+          label: "Star",
+        },
       ],
-      mapId: null,
+      value: "",
 
+      map: null,
+      view: null,
+      positionLayer: null,
+      featuresArr: [],
+
+      opt: {
+        img: "",
+        imgsize: "",
+      },
+      geo: null,
+      vlayer: null,
+      draw: null,
+      source: null,
+      multiSource: null,
+      vector: null,
       ws: null,
-      systemID: null,
       bLockEx: true,
-      wsMsg: null, //ws发送来的数据
-      iswsMsg: false, //是否是推送ws
-
-      ishaw: true,
-      order: 0,
-      mapIndex: 0,
-      curmap: {},
-      mapUrlList: [
-        "https://scpic3.chinaz.net/Files/pic/pic9/202107/apic34088_s.jpg",
-        "https://scpic2.chinaz.net/Files/pic/pic9/202107/hpic4220_s.jpg",
-        "https://scpic.chinaz.net/Files/pic/pic9/202107/hpic4223_s.jpg",
-        "https://scpic1.chinaz.net/Files/pic/pic9/202107/bpic23746_s.jpg",
-        "https://scpic1.chinaz.net/Files/pic/pic9/202107/bpic23750_s.jpg",
-      ],
-      mapUrl: "https://scpic.chinaz.net/Files/pic/pic9/202107/bpic23751_s.jpg",
-      mapData: [
-        {
-          companyId: 103,
-          createTime: 1626251459109,
-          creator: "admin",
-          idx: 39,
-          isDefault: 0,
-          layerId: 3,
-          lcid: "LCID14vMn1eA",
-          mapActualX: 111,
-          mapActualY: 111,
-          mapName: "平面图",
-          mapOriginX: 111,
-          mapOriginY: 111,
-          mapPath:
-            "https://scpic2.chinaz.net/Files/pic/pic9/202107/apic34073_s.jpg",
-          mapPathName: "11.jpg",
-          mapPixelX: 1000,
-          mapPixelY: 1000,
-          nodeName: "平面图",
-          parentId: 0,
-          remark: "",
-          type: "layer",
-          updateTime: 1626411645235,
-          updator: "admin",
-        },
-        {
-          companyId: 103,
-          createTime: 1626224371584,
-          creator: "admin",
-          idx: 37,
-          isDefault: 1,
-          layerId: 1,
-          lcid: "LCIDQOqLHGIr",
-          mapActualX: 66.25,
-          mapActualY: 30.96,
-          mapName: "公司地图",
-          mapOriginX: -14,
-          mapOriginY: -18.17,
-          mapPath:
-            "https://scpic.chinaz.net/Files/pic/pic9/202004/zzpic24382_s.jpg",
-          mapPathName: "company.png",
-          mapPixelX: 3041,
-          mapPixelY: 1422,
-          nodeName: "公司地图",
-          parentId: 0,
-          remark: "",
-          type: "layer",
-          updateTime: 1626405752153,
-          updator: "admin",
-        },
-      ],
-      iconlist: [
-        {
-          note: "1",
-          color: "#F57756",
-          icon: "al-icon-carcustmer",
-          remark: "1",
-          type: "",
-          companyId: 103,
-          createTime: 1625760000000,
-          name: "1",
-          idx: 9,
-        },
-        {
-          note: "1",
-          color: "#F57756",
-          icon: "al-icon-carcustmer",
-          remark: "1",
-          type: "",
-          companyId: 103,
-          createTime: 1625760000000,
-          name: "1",
-          idx: 10,
-        },
-        {
-          note: "1",
-          color: "#E64373",
-          icon: "al-icon-carhuowu",
-          type: "material",
-          companyId: 103,
-          createTime: 1626077323805,
-          name: "包装箱",
-          idx: 31,
-        },
-        {
-          note: "12",
-          color: "#E64373",
-          icon: "al-icon-carcustmer",
-          updateTime: 1626223715587,
-          remark: "12",
-          type: "staff",
-          companyId: 103,
-          createTime: 1625809885533,
-          name: "小时工",
-          idx: 11,
-        },
-        {
-          color: "#F5B556",
-          icon: "al-icon-carshigongrenyuan",
-          updateTime: 1626223720933,
-          type: "staff",
-          companyId: 103,
-          createTime: 1626082606650,
-          name: "临时工",
-          idx: 32,
-        },
-        {
-          note: "1212",
-          color: "#E643CF",
-          icon: "al-icon-carlunchuan2",
-          updateTime: 1626223981646,
-          remark: "1212",
-          type: "car",
-          companyId: 103,
-          createTime: 1625810113596,
-          name: "叉车1",
-          idx: 26,
-        },
-        {
-          note: "aaa",
-          color: " #F57756",
-          icon: "al-icon-caric_local_shipping_px",
-          updateTime: 1626224005626,
-          remark: "aaa",
-          type: "car",
-          companyId: 103,
-          createTime: 1625809947504,
-          name: "咨询车",
-          idx: 14,
-        },
-        {
-          note: "12",
-          color: " #F57756",
-          icon: "al-icon-carhuowu",
-          updateTime: 1626224027182,
-          remark: "12",
-          type: "material",
-          companyId: 103,
-          createTime: 1626061504018,
-          name: "物料资源",
-          idx: 30,
-        },
-        {
-          color: "#EF7613",
-          icon: "al-icon-caryuangong",
-          type: "staff",
-          companyId: 103,
-          createTime: 1626311747293,
-          name: "testee",
-          idx: 35,
-        },
-        {
-          color: "#E64373",
-          updateTime: 1626334088719,
-          type: "car",
-          companyId: 103,
-          createTime: 1625810132618,
-          name: "资源3",
-          idx: 29,
-        },
-        {
-          color: "#E64373",
-          updateTime: 1626334094249,
-          type: "car",
-          companyId: 103,
-          createTime: 1625810126106,
-          name: "吊车",
-          idx: 28,
-        },
-        {
-          color: "#F57756",
-          icon: "al-icon-cardiaoche",
-          updateTime: 1626334103390,
-          type: "car",
-          companyId: 103,
-          createTime: 1625810120462,
-          name: "叉车2",
-          idx: 27,
-        },
-        {
-          note: "1221",
-          color: "#F5B556",
-          icon: "al-icon-caric_local_shipping_px",
-          updateTime: 1626334152589,
-          remark: "2112",
-          type: "car",
-          companyId: 103,
-          createTime: 1625810058642,
-          name: "货车",
-          idx: 21,
-        },
-        {
-          note: "qewe",
-          color: " #F57756",
-          icon: "al-icon-caric_local_shipping_px",
-          updateTime: 1626334167293,
-          remark: "qeq",
-          type: "car",
-          companyId: 103,
-          createTime: 1625810069419,
-          name: "雪弗兰",
-          idx: 22,
-        },
-        {
-          note: "1111",
-          color: " #F57756",
-          icon: "al-icon-caric_local_shipping_px",
-          updateTime: 1626337305560,
-          remark: "11111",
-          type: "car",
-          companyId: 103,
-          createTime: 1625810081645,
-          name: "桑塔纳",
-          idx: 23,
-        },
-        {
-          note: "1",
-          color: "#F5B556",
-          icon: "al-icon-caric_local_shipping_px",
-          updateTime: 1626339117670,
-          remark: "1",
-          type: "car",
-          companyId: 103,
-          createTime: 1625810095759,
-          name: "运输车",
-          idx: 24,
-        },
-        {
-          note: "12",
-          color: " #F57756",
-          icon: "al-icon-carlunchuan2",
-          updateTime: 1626339120784,
-          remark: "12",
-          type: "car",
-          companyId: 103,
-          createTime: 1625810106544,
-          name: "碰碰车",
-          idx: 25,
-        },
-        {
-          note: "aaa",
-          color: "#E643CF",
-          icon: "al-icon-caric_local_shipping_px",
-          type: "car",
-          companyId: 103,
-          createTime: 1626688205103,
-          name: "aaa",
-          idx: 36,
-        },
-      ],
-      icontypes: [],
-      fenceData: [], //围栏数据
-      cameraData: [], //摄像头数据
-      playerVideoUrl: "ws://192.168.3.214:8866/live?url=", //摄像头的ws请求地址
     };
   },
-  created() {
-    this.getMapList();
-    this.initLeave();
-  },
   mounted() {
-    this.getIconList();
+    this.initmap();
     this.webSocketPosition();
+    this.busEmitOn();
   },
+
   methods: {
-    quickStatistics(){
-      this.$refs.openmap.quickStatistics()
+    //创建多边形
+    createPolygon() {
+      //添加图层，并设置点范围
+      const polygon = new Feature({
+        geometry: new Polygon([
+          [
+            [0, 20],
+            [20, 300],
+            [160, 120],
+            [100, 300],
+          ],
+        ]),
+      });
+      //设置样式
+      polygon.setStyle(
+        new Style({
+          stroke: new Stroke({
+            width: 4,
+            color: [255, 0, 0, 1],
+          }),
+        })
+      );
+      //将图形加到地图上
+      this.map.addLayer(
+        new VectorLayer({
+          source: new VectorSource({
+            features: [polygon],
+          }),
+        })
+      );
     },
-    //下发文字撤离
-    onleaveTxt(e) {
-      oneKeyOut(e).then((response) => {
-        if (response.code == 200) {
-          console.log("成功了");
-        } else {
-          console.log("失败了", response.data);
-        }
+
+    //操作事件
+    onEdit() {
+      console.log("");
+      const transform = new ExtTransform({
+        enableRotatedTransform: false,
+        hitTolerance: 2,
+        translate: true, // 拖拽
+        stretch: false, // 拉伸
+        scale: true, // 缩放
+        rotate: true, // 旋转
+        translateFeature: false,
+        noFlip: true,
+        // layers: [],
+      });
+      this.map.addInteraction(transform);
+
+      //开始事件
+      transform.on(["rotatestart", "translatestart"], function (e) {
+        // Rotation
+        let startangle = e.feature.get("angle") || 0;
+        // Translation
+        console.log(1111);
+        console.log(startangle);
+      });
+      //旋转
+      transform.on("rotating", function (e) {
+        console.log(2222);
+        console.log(
+          "rotate: " +
+            ((((e.angle * 180) / Math.PI - 180) % 360) + 180).toFixed(2)
+        );
+        console.log(e);
+      });
+      //移动
+      transform.on("translating", function (e) {
+        console.log(3333);
+        console.log(e.delta);
+        console.log(e);
+      });
+      //拖拽事件
+      transform.on("scaling", function (e) {
+        console.log(4444);
+        console.log(e.scale);
+        console.log(e);
+      });
+      //事件结束
+      transform.on(["rotateend", "translateend", "scaleend"], function (e) {
+        console.log(5555);
       });
     },
 
-    // 获取撤离下发文字
-    initLeave() {
-      getDicts("sys_view_index").then((response) => {
-        if (response.code == 200) {
-          response.data.map((item) => {
-            console.log(item);
-            item.value = item.dictValue;
-            item.label = item.dictLabel;
-          });
-          this.leaveTxt = response.data;
-          console.log("最后文字接口", this.leaveTxt);
-        }
+    busEmitOn() {
+      console.log("初始化");
+      bus.$on("testbus", (content) => {
+        console.log("内容多次", content);
       });
     },
-    showhaw() {
-      this.ishaw = !this.ishaw;
-    },
-    changePic() {
-      this.mapUrl = this.mapUrlList[this.order];
-      ++this.order;
-      if (this.order > this.mapUrlList.length) {
-        this.order = 0;
-      }
-    },
-    changeMap() {
-      let donfig = this.mapData[this.mapIndex];
 
-      let dataconfig = {};
-      dataconfig.url = donfig.mapPath;
-      dataconfig.RealWidth = donfig.mapActualX;
-      dataconfig.RealHeight = donfig.mapActualY;
-      dataconfig.PixelWidth = donfig.mapPixelX;
-      dataconfig.PixelHeight = donfig.mapPixelY;
-      dataconfig.dPR = donfig.mapPixelX / donfig.mapActualX;
-      dataconfig.ZeroPoint = [donfig.mapOriginX, donfig.mapOriginY];
-      dataconfig.param = false;
-      this.curmap = dataconfig;
-      ++this.mapIndex;
-      if (this.mapIndex >= this.mapData.length) {
-        this.mapIndex = 0;
+    addStar() {
+      let extent = this.view.calculateExtent(this.map.getSize());
+      for (let i = 0; i < 1; i++) {
+        var dx = extent[2] - extent[0],
+          dy = extent[3] - extent[1];
+        setTimeout(this.addFeature, 200 * (i + 1), [
+          extent[0] + dx * Math.random(1),
+          extent[1] + dy * Math.random(1),
+        ]);
       }
     },
 
-    getIconList() {
-      let tagTypes = [];
-      for (let i = 0; i < this.iconlist.length; i++) {
-        const type = this.iconlist[i].type;
-        if (tagTypes[type]) {
-          tagTypes[type].push(this.iconlist[i]);
-        } else {
-          tagTypes[type] = [];
-          tagTypes[type].push(this.iconlist[i]);
+    addFeature(coordinates) {
+      var f = new ol.Feature({
+        geometry: new ol.geom.Point(coordinates),
+      });
+      var geom = f.getGeometry();
+      var xy = geom.getCoordinates();
+      var extent = this.view.calculateExtent(this.map.getSize());
+      var dy = extent[3] - xy[1];
+      var c = 0.01;
+      var key = this.map.on("postcompose", function (e) {
+        if (c >= 1) {
+          this.map.unByKey(key);
         }
+        c += 0.01;
+        geom.setCoordinates([xy[0], xy[1] + dy * (1 - ol.easing.inAndOut(c))]);
+      });
+      geom.setCoordinates([xy[0], xy[1] + dy * (1 - ol.easing.inAndOut(c))]);
+
+      this.vector.getSource().addFeature(f);
+    },
+
+    localpos() {
+      const polygon = this.multiSource.getFeatures()[3].getGeometry();
+      this.view.fit(polygon, { padding: [170, 50, 30, 150] });
+    },
+    localpos1() {
+      const polygon1 = this.multiSource.getFeatures()[1].getGeometry();
+      console.log(
+        "nihao ",
+        polygon1,
+        polygon1.getCoordinates(),
+        this.map.getSize()
+      );
+      this.view.centerOn(
+        polygon1.getCoordinates(),
+        this.map.getSize(),
+        [160, 60]
+      );
+    },
+    localpos2() {
+      const polygon2 = this.multiSource.getFeatures()[1].getGeometry();
+      this.view.fit(polygon2, {
+        padding: [170, 50, 30, 150],
+        minResolution: 50,
+      });
+    },
+
+    initmap() {
+      // 定义坐标系
+      var projection = new Projection({
+        // code: "EPSG:900931", // 用“米”做单位的x/y坐标的投影
+        code: "xkcd-image",
+        units: "pixels", // 单位：像素
+        extent: [0, 0, 1200, 600], // 图片图层四至,分别是静态图片左下角和右上角的基于基站的坐标
+      });
+      this.view = new olView({
+        center: [108, 30],
+        projection: projection,
+        zoom: 2,
+      });
+
+      var imageLayer = new Image({
+        source: new ImageStatic({
+          //   url: require('../../../public/image/wb.png'),
+          url: "https://scpic.chinaz.net/files/pic/pic9/202102/hpic3599.jpg",
+          // imageSize: [1300, 980], // 图片尺寸（px）  [长,宽]
+          projection: projection,
+          imageExtent: [-500, -100, 1200, 600], // // 映射到地图的范围
+        }),
+        style: new Style({
+          fill: new Fill({
+            color: "rgba(255, 255, 255, 0.2",
+          }),
+          stroke: new Stroke({
+            color: "#ffcc33",
+            width: 2,
+          }),
+          image: new Icon({
+            // src: '../../../../public/static/icon/5ren.png',
+            src: require("../../public/static/icon/5ren.png"),
+            anchor: [0.5, 1],
+            // src: 'https://openlayers.org/en/v4.6.5/examples/data/icon.png'
+          }),
+        }),
+      });
+
+      this.source = new VectorSource({ wrapX: false });
+
+      this.vector = new VectorLayer({
+        source: this.source,
+      });
+
+      this.map = new olMap({
+        target: "map",
+        controls: defaultControls({
+          zoom: true,
+        }).extend([]),
+        layers: [
+          imageLayer,
+          this.vector,
+
+          // vlayer,
+        ],
+        view: this.view,
+      });
+
+      this.geo =
+        "http://192.168.3.92:8002" +
+        "/fenceInfo/findListByFenceTypeGeoJson?fenceType=polling&layerId=" +
+        this.mapValue;
+
+      // this.map.addLayer(vlayer);
+      // this.Popup();
+
+      this.addIcon();
+
+      this.createPolygon();
+    },
+
+    changeType(e) {
+      this.map.removeInteraction(this.draw);
+      this.addInteraction();
+    },
+
+    addInteraction() {
+      var value = this.value;
+      if (value !== "None") {
+        var geometryFunction;
+        if (value === "Square") {
+          value = "Circle";
+          geometryFunction = createRegularPolygon(4);
+        } else if (value === "Box") {
+          value = "Circle";
+          geometryFunction = createBox();
+        } else if (value === "Star") {
+          value = "Circle";
+          geometryFunction = function (coordinates, geometry) {
+            var center = coordinates[0];
+            var last = coordinates[coordinates.length - 1];
+            var dx = center[0] - last[0];
+            var dy = center[1] - last[1];
+            console.log("绘制", center, last, dx, dy);
+
+            var radius = Math.sqrt(dx * dx + dy * dy);
+            var rotation = Math.atan2(dy, dx);
+            var newCoordinates = [];
+            var numPoints = 12;
+            for (var i = 0; i < numPoints; ++i) {
+              var angle = rotation + (i * 2 * Math.PI) / numPoints;
+              var fraction = i % 2 === 0 ? 1 : 0.5;
+              var offsetX = radius * fraction * Math.cos(angle);
+              var offsetY = radius * fraction * Math.sin(angle);
+              newCoordinates.push([center[0] + offsetX, center[1] + offsetY]);
+            }
+            newCoordinates.push(newCoordinates[0].slice());
+            if (!geometry) {
+              geometry = new Polygon([newCoordinates]);
+            } else {
+              geometry.setCoordinates([newCoordinates]);
+            }
+            return geometry;
+          };
+        }
+        this.draw = new Draw({
+          source: this.source,
+          type: value,
+          geometryFunction: geometryFunction,
+          snapTolerance: 1,
+        });
+        this.map.addInteraction(this.draw);
       }
-      this.icontypes = tagTypes;
+    },
+
+    addIcon() {
+      var iconFeature = new Feature(new Point([0, 0]));
+      iconFeature.set("style", this.createStar("data/icon.png", undefined));
+
+      var iconFeature1 = new Feature(new Point([60, 0]));
+      iconFeature1.set("style", this.createStyle("data/icon.png", undefined));
+
+      var iconFeature3 = new Feature(
+        new LineString([
+          [0, 0],
+          [600, 600],
+        ])
+      );
+      iconFeature3.set(
+        "style",
+        new Style({
+          stroke: new Stroke({
+            color: "rgb(28 127 82)",
+            width: 2,
+          }),
+          //  color: "rgba(" + r + ",0.1)",
+        })
+      );
+
+      var iconFeature4 = new Feature(
+        new Polygon([
+          [
+            [0, 20],
+            [20, 600],
+            [60, 120],
+            [200, 600],
+          ],
+        ])
+      );
+      iconFeature4.set(
+        "style",
+        new Style({
+          //  color: "rgba(" + r + ",0.1)",
+          fill: new Fill({
+            color: "rgb(64 158 255)",
+          }),
+        })
+      );
+
+      var iconFeature5 = new Feature(new Point([160, 100]));
+      iconFeature5.set(
+        "style",
+        new Style({
+          image: new Icon({
+            anchor: [0.5, 1],
+            src: require("../../public/static/icon/5ren.png"),
+            // src: require('../../../../public/image/5ren.png'),
+            // color: "#f00",
+            // rotation: Math.PI / 4,
+            // opacity: 0.2,
+
+            stroke: new Stroke({
+              color: "#ff0000",
+              width: 30,
+            }),
+          }),
+          fill: new Fill({
+            color: "#1fca04",
+            opacity: 1,
+          }),
+          stroke: new Stroke({
+            color: "#ff0000",
+            width: 3,
+          }),
+          text: new Text({
+            text: "锚点显示111",
+            scale: [1, 1],
+            textAlign: "center",
+            // color: "#f00",
+            textBaseline: "top",
+          }),
+        })
+      );
+
+      this.multiSource = new VectorSource({
+        features: [iconFeature, iconFeature1, iconFeature3],
+      });
+      this.multiSource.addFeature(iconFeature5);
+      this.multiSource.addFeature(iconFeature4);
+      this.vlayer = new VectorLayer({
+        style: function (feature) {
+          return feature.get("style");
+        },
+        source: this.multiSource,
+      });
+
+      this.map.addLayer(this.vlayer);
+    },
+
+    // 气泡弹窗显示
+    initIcon1() {
+      var iconmp = new Style({
+        image: new Icon({
+          anchorXUnits: "fraction",
+          anchorYUnits: "fraction",
+          offset: [100, 0],
+          Size: [22, 22],
+          //   src: require('/static/icon/5ren.png'),
+          src: require("../../public/static/icon/5ren.png"),
+          opacity: 1,
+          // anchor: [0.5, 0.5],//图标锚点位置，单位由anchorXUnits和anchorYUnits确定，缺省为百分比
+        }),
+      });
+      var iconLayer = new VectorLayer({
+        style: iconmp,
+      });
+      this.map.addLayer(iconLayer);
+    },
+
+    // 创建简单的icon
+    createStyle(src, img) {
+      return new Style({
+        image: new Icon({
+          // anchor: [0.5, 0.96],
+          anchor: [0.5, 1],
+          src: require("../../public/static/icon/5ren.png"),
+          //   src: require('/static/icon/5ren.png'),
+          img: img,
+          color: "#f00",
+          rotation: Math.PI / 4,
+          // imgSize: img ? [img.width, img.height] : undefined,
+        }),
+        text: new Text({
+          text: "锚点",
+          scale: [1, 1],
+          textAlign: "center",
+          color: "#f00",
+          textBaseline: "top",
+        }),
+      });
+    },
+
+    createStar() {
+      return new Style({
+        image: new RegularShape({
+          points: 5,
+          radius1: 20,
+          radius2: 10,
+          fill: new Fill({
+            color: "#ffff00",
+          }),
+          stroke: new Stroke({
+            width: 1,
+            color: "00ffff",
+          }),
+        }),
+      });
+    },
+
+    FenceStyle(f, r) {
+      return [
+        new Style({
+          fill: new Fill({
+            color: "rgba(" + r + ",0.1)",
+          }),
+          stroke: new Stroke({
+            lineDash: [1, 2, 3, 4, 5, 6],
+            color: "rgb(" + r + ")",
+            width: 2,
+          }),
+          image: new Circle({
+            radius: 7,
+            fill: new Fill({
+              color: "#FF0000",
+            }),
+          }),
+          text: new Text({
+            text: f.get("name"),
+            font: "bold 14px Arial",
+            textAlign: "center",
+            textBaseline: "middle",
+            offsetX: 0,
+            offsetY: 0,
+            fill: new Fill({
+              color: "#FF0000",
+            }),
+            stroke: new Stroke({
+              color: "#fff",
+              width: 3,
+            }),
+          }),
+        }),
+      ];
     },
 
     webSocketPosition() {
@@ -533,30 +590,30 @@ export default {
         register: self.systemID,
       });
       if ("WebSocket" in window) {
-        // self.ws = new WebSocket(
-        //   "ws://192.168.3.214:8080/socket/websocket/socketServer.do"
-        // );
-        self.ws = new WebSocket(
-          "ws://192.168.3.92:8762/websocket/socketServer.do"
-        );
+        let url = "ws://192.168.3.214:8080/socket/websocket/socketServer.do";
+        self.ws = new WebSocket(url);
         self.ws.onopen = function () {
           self.webSocketOnSend(param);
+
           console.log("数据发送中...");
         };
         self.ws.onmessage = function (evt) {
-          self.getMessage(evt.data);
+          console.log(evt);
+          //  self.getMessage(evt.data);
         };
+
+        self.ws.onmessage = function (evt) {
+          console.log(evt.data);
+          self.getMessage(JSON.parse(evt.data));
+        };
+
         self.ws.onclose = function () {
-          console.log("ws连接已关闭...");
-        };
-        self.ws.onerror = function () {
-          console.log("ws出错");
+          console.log("连接已关闭...");
         };
       } else {
         console.log("您的浏览器不支持WebSocket!");
       }
     },
-
     webSocketOnSend(data) {
       const self = this;
       if (self.ws.readyState === 1) {
@@ -566,161 +623,87 @@ export default {
 
     getMessage(el) {
       const self = this;
-      const result = JSON.parse(el);
-
+      const result = el;
       if (result.message === "handshake") {
+        let json = JSON.stringify({ key: "1626945204067", layerId: "37" });
+        self.webSocketOnSend(json);
       } else if (result.message === "Point") {
         if (self.bLockEx) {
           self.bLockEx = false;
-          self.wsMsg = result;
+          const format = new GeoJSON();
+          const newFeatures = format.readFeatures(result.data);
+          newFeatures.forEach(function (f) {
+            // const coords = _TransPixel(f.getGeometry().getCoordinates());
+            const coords = f.getGeometry().getCoordinates();
+            const tag = self.TagSource.getFeatureById(f.get("resourceId"));
+            if (tag != null) {
+              if (
+                tag.get("pos_x") - 0.3 > f.get("pos_x") ||
+                tag.get("pos_x") + 0.3 < f.get("pos_x") ||
+                tag.get("pos_y") - 0.3 > f.get("pos_y") ||
+                tag.get("pos_y") + 0.3 < f.get("pos_y")
+              ) {
+                tag.set("pos_x", f.get("pos_x"));
+                tag.set("pos_y", f.get("pos_y"));
+                tag.set("axis", f.get("axis"));
+                tag.getGeometry().setCoordinates(coords);
+                // updateOverPopupPosition(tag, coords);
+              }
+            } else {
+              console.log(f);
+              f.getGeometry().setCoordinates(coords);
+              f.setId(f.get("resourceId"));
+              f.set("visible", true);
+              self.TagSource.addFeature(f);
+              self.options.push({
+                label: f.get("itemname"),
+                value: f.get("resourceId"),
+              });
+            }
+          });
           self.bLockEx = true;
         }
       }
-    },
-
-    getWsPoint() {
-      const param = JSON.stringify({
-        key: this.systemID,
-        // layerId: this.mapId,
-        layerId: "160",
-      });
-      this.webSocketOnSend(param);
-    },
-
-    handleChange(val, type) {
-      this.colorFlag = val;
-      this.drawFormValue = type;
-    },
-
-    //获取地图列表
-    getMapList() {
-      getMapTree().then((res) => {
-        if (res.code == 200) {
-          this.mapList = res.data;
-        }
-      });
-    },
-
-    nodeClick() {
-      console.log(this.mapId);
-      getMap(this.mapId).then((res) => {
-        if (res.code == 200) {
-          let RES = res.data;
-          if (RES != undefined) {
-            RES.mapPath = "http://192.168.11.214:8080" + "/file" + RES.mapPath;
-            this.initMapRule(RES);
-          }
-          this.getWsPoint();
-        }
-      });
-    },
-    //格式化地图控件
-    initMapRule(donfig) {
-      let dataconfig = {};
-      dataconfig.mapName = donfig.mapName;
-      dataconfig.idx = donfig.idx;
-      dataconfig.url = donfig.mapPath;
-      dataconfig.RealWidth = donfig.mapActualX;
-      dataconfig.RealHeight = donfig.mapActualY;
-      dataconfig.PixelWidth = donfig.mapPixelX;
-      dataconfig.PixelHeight = donfig.mapPixelY;
-      dataconfig.dPR = donfig.mapPixelX / donfig.mapActualX;
-      dataconfig.ZeroPoint = [donfig.mapOriginX, donfig.mapOriginY];
-      dataconfig.param = false;
-      this.curmap = dataconfig;
-      this.initFence();
-      this.initCamera();
-    },
-
-    //获取icon的轨迹数据
-    queryTrackData(e) {
-      console.log(e);
-      getHistoryInfoDetail(e).then((res) => {
-        if (res.code == 200) {
-          this.trackData = res.data;
-        }
-      });
-    },
-    //折叠面板
-    collapseChange(val) {
-      console.log(val);
-    },
-    initFence() {
-      getLayerFenceDataList(this.curmap.idx).then((res) => {
-        if (res.code == 200) {
-          console.log(res.data);
-          this.tableFence = res.data;
-        }
-      });
-    },
-    //初始化摄像头
-    initCamera() {
-      getCameraLayerList(this.curmap.idx).then((res) => {
-        if (res.code == 200) {
-          this.tableCamera = res.data;
-        }
-      });
-    },
-
-    //勾选单个围栏
-    clickShowFence(row) {
-      this.fenceData = [];
-      if (row.length > 0) {
-        row.map((item) => {
-          this.addSingleFence(item.idx);
-        });
-      }
-    },
-    //勾选多个围栏即查所有围栏
-    clickShowCompleteFence(row) {
-      if (row.length == this.tableFence.length) {
-        getAllFence(this.curmap.idx).then((res) => {
-          if (res.code == 200) {
-            this.fenceData = res.data;
-          }
-        });
-      } else {
-        this.fenceData = [];
-      }
-    },
-
-    //围栏接口调用
-    addSingleFence(value) {
-      getSingeFence(value).then((res) => {
-        if (res.code == 200) {
-          this.fenceData.push(res.data[0]);
-        }
-      });
-    },
-
-    //单选摄像头
-    clickShowCamera(row) {
-      this.cameraData = [];
-      if (row.length > 0) {
-        row.map((item) => {
-          this.addSingleCamera(item.idx);
-        });
-      }
-    },
-    //全选摄像头
-    clickShowCompleteCamera(row) {
-      if (row.length == this.tableFence.length) {
-      } else {
-        this.cameraData = [];
-      }
-    },
-
-    //获取摄像头资源列表
-    addSingleCamera(idx) {
-      getSingleCameraGeoJson(idx).then((res) => {
-        if (res.code == 200) {
-          this.cameraData.push(res.data);
-        }
-      });
     },
   },
 };
 </script>
 
-<style>
+<style scoped>
+#map {
+  width: 97%;
+  margin: 0 auto;
+  /* background: rgb(238, 238, 238); */
+}
+.con-box {
+  width: 100%;
+  height: 100%;
+  border: 1px solid #999999;
+}
+.map {
+  height: 500px;
+  border: 1px solid;
+}
+.icon_but {
+  margin: 0 10px;
+  padding: 10px;
+  border: 1px solid red;
+}
+.toolbar {
+  margin: 10px;
+}
+.toolbar span {
+  display: inline-block;
+}
+
+.ol-popup {
+  border: 1px solid red;
+  font-size: 20px;
+  font-weight: bolder;
+}
+.con-box {
+  width: 100%;
+  height: calc(100% - 84px);
+  border: 1px solid #999999;
+}
 </style>
