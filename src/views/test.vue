@@ -1,5 +1,7 @@
 <template>
-  <div>文件你的我的他的2323所得内容</div>
+  <div>
+    asd
+  </div>
 </template>
 
 <script>

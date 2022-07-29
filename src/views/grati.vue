@@ -171,6 +171,7 @@ export default {
     };
   },
   mounted() {
+    console.log("问的我都吐了", this.$route.params);
     this.initgrid();
     this.initmap();
   },

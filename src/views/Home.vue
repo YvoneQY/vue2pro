@@ -13,23 +13,13 @@
         :value="item.value"
       />
     </el-select>
-    <div @click="addStar()">添加</div>
-    <div @click="onEdit()">编辑了</div>
-    <div @click="localpos()">定位指定</div>
-    <div @click="localpos1()">定位指定1</div>
-    <div @click="localpos2()">定位指定2</div>
+    <!-- <span @click="localpos()">定位指定</span>
+    <span @click="localpos1()">定位指定1</span> -->
+    <span @click="localpos2()">定位指定2</span>
+    <span @click="addRandomFeature()">添加动画</span>
+    <span @click="hasRandomFeature()">已经有点额</span>
+    <span @click="animateDot()">animateDot</span>
     <div id="map" class="map" />
-
-    <!-- <div
-      class="popup-info-div"
-      style="height：100px;width:100px;border:1px solid red;display:none"
-    >
-      <div id="popup-info" class="ol-popup">
-        <a href="#" id="popup-closer" class="ol-popup-closer">close</a>
-        <div id="popup-title" class="popup-title"></div>
-        <div id="popup-content"></div>
-      </div>
-    </div> -->
   </div>
 </template>
 
@@ -45,7 +35,6 @@ import VectorSource from "ol/source/Vector";
 import { Point, LineString, Polygon } from "ol/geom";
 import XYZ from "ol/source/XYZ";
 import { Map, View, Feature, ol } from "ol";
-
 import {
   Circle,
   Fill,
@@ -54,16 +43,17 @@ import {
   Text,
   Icon,
   Circle as CircleStyle,
-  RegularShape,
 } from "ol/style.js";
 import Overlay from "ol/Overlay.js";
 import { Image } from "ol/layer.js";
 import { OSM, Vector, ImageStatic } from "ol/source";
 import { defaults as defaultControls } from "ol/control";
-import { GeoJSON } from "ol/format.js";
+
 import Draw, { createBox, createRegularPolygon } from "ol/interaction/Draw";
-import bus from "@/util/bus";
-import ExtTransform from "ol-ext/interaction/Transform";
+import { unByKey } from "ol/Observable";
+import { getVectorContext } from "ol/render";
+import { easeIn, easeOut } from "ol/easing";
+import { Tile as TileLayer } from "ol/layer";
 
 export default {
   data() {
@@ -106,153 +96,24 @@ export default {
       draw: null,
       source: null,
       multiSource: null,
-      vector: null,
-      ws: null,
-      bLockEx: true,
+      feature: null,
+      duration: 3000,
+      tileLayer: null,
+      testArr: [],
     };
   },
   mounted() {
     this.initmap();
-    this.webSocketPosition();
-    this.busEmitOn();
+    this.addFeather();
   },
 
   methods: {
-    //创建多边形
-    createPolygon() {
-      //添加图层，并设置点范围
-      const polygon = new Feature({
-        geometry: new Polygon([
-          [
-            [0, 20],
-            [20, 300],
-            [160, 120],
-            [100, 300],
-          ],
-        ]),
-      });
-      //设置样式
-      polygon.setStyle(
-        new Style({
-          stroke: new Stroke({
-            width: 4,
-            color: [255, 0, 0, 1],
-          }),
-        })
-      );
-      //将图形加到地图上
-      this.map.addLayer(
-        new VectorLayer({
-          source: new VectorSource({
-            features: [polygon],
-          }),
-        })
-      );
-    },
-
-    //操作事件
-    onEdit() {
-      console.log("");
-      const transform = new ExtTransform({
-        enableRotatedTransform: false,
-        hitTolerance: 2,
-        translate: true, // 拖拽
-        stretch: false, // 拉伸
-        scale: true, // 缩放
-        rotate: true, // 旋转
-        translateFeature: false,
-        noFlip: true,
-        // layers: [],
-      });
-      this.map.addInteraction(transform);
-
-      //开始事件
-      transform.on(["rotatestart", "translatestart"], function (e) {
-        // Rotation
-        let startangle = e.feature.get("angle") || 0;
-        // Translation
-        console.log(1111);
-        console.log(startangle);
-      });
-      //旋转
-      transform.on("rotating", function (e) {
-        console.log(2222);
-        console.log(
-          "rotate: " +
-            ((((e.angle * 180) / Math.PI - 180) % 360) + 180).toFixed(2)
-        );
-        console.log(e);
-      });
-      //移动
-      transform.on("translating", function (e) {
-        console.log(3333);
-        console.log(e.delta);
-        console.log(e);
-      });
-      //拖拽事件
-      transform.on("scaling", function (e) {
-        console.log(4444);
-        console.log(e.scale);
-        console.log(e);
-      });
-      //事件结束
-      transform.on(["rotateend", "translateend", "scaleend"], function (e) {
-        console.log(5555);
-      });
-    },
-
-    busEmitOn() {
-      console.log("初始化");
-      bus.$on("testbus", (content) => {
-        console.log("内容多次", content);
-      });
-    },
-
-    addStar() {
-      let extent = this.view.calculateExtent(this.map.getSize());
-      for (let i = 0; i < 1; i++) {
-        var dx = extent[2] - extent[0],
-          dy = extent[3] - extent[1];
-        setTimeout(this.addFeature, 200 * (i + 1), [
-          extent[0] + dx * Math.random(1),
-          extent[1] + dy * Math.random(1),
-        ]);
-      }
-    },
-
-    addFeature(coordinates) {
-      var f = new ol.Feature({
-        geometry: new ol.geom.Point(coordinates),
-      });
-      var geom = f.getGeometry();
-      var xy = geom.getCoordinates();
-      var extent = this.view.calculateExtent(this.map.getSize());
-      var dy = extent[3] - xy[1];
-      var c = 0.01;
-      var key = this.map.on("postcompose", function (e) {
-        if (c >= 1) {
-          this.map.unByKey(key);
-        }
-        c += 0.01;
-        geom.setCoordinates([xy[0], xy[1] + dy * (1 - ol.easing.inAndOut(c))]);
-      });
-      geom.setCoordinates([xy[0], xy[1] + dy * (1 - ol.easing.inAndOut(c))]);
-
-      this.vector.getSource().addFeature(f);
-    },
-
     localpos() {
       const polygon = this.multiSource.getFeatures()[3].getGeometry();
       this.view.fit(polygon, { padding: [170, 50, 30, 150] });
     },
     localpos1() {
       const polygon1 = this.multiSource.getFeatures()[1].getGeometry();
-      console.log(
-        "nihao ",
-        polygon1,
-        polygon1.getCoordinates(),
-        this.map.getSize()
-      );
       this.view.centerOn(
         polygon1.getCoordinates(),
         this.map.getSize(),
@@ -260,14 +121,34 @@ export default {
       );
     },
     localpos2() {
-      const polygon2 = this.multiSource.getFeatures()[1].getGeometry();
-      this.view.fit(polygon2, {
-        padding: [170, 50, 30, 150],
-        minResolution: 50,
-      });
+      // const polygon2 = this.multiSource.getFeatures()[1].getGeometry()
+      // this.view.fit(polygon2, { padding: [170, 50, 30, 150], minResolution: 50 })
+      console.log("查看中心带你", this.view.getCenter());
+      const rome = [160, 60];
+      const center = this.view.getCenter();
+      this.view.animate(
+        {
+          center: [
+            center[0] + (rome[0] - center[0]) / 2,
+            center[1] + (rome[1] - center[1]) / 2,
+          ],
+          rotation: Math.PI,
+          easing: easeIn,
+        },
+        {
+          center: rome,
+          rotation: 2 * Math.PI,
+          easing: easeOut,
+        }
+      );
     },
 
     initmap() {
+      this.tileLayer = new TileLayer({
+        source: new OSM({
+          wrapX: false,
+        }),
+      });
       // 定义坐标系
       var projection = new Projection({
         // code: "EPSG:900931", // 用“米”做单位的x/y坐标的投影
@@ -283,16 +164,16 @@ export default {
 
       var imageLayer = new Image({
         source: new ImageStatic({
-          //   url: require('../../../public/image/wb.png'),
-          url: "https://scpic.chinaz.net/files/pic/pic9/202102/hpic3599.jpg",
+          url: require("../../public/static/img/msg.svg"),
+          // url: "https://scpic.chinaz.net/files/pic/pic9/202102/hpic3599.jpg",
           // imageSize: [1300, 980], // 图片尺寸（px）  [长,宽]
           projection: projection,
           imageExtent: [-500, -100, 1200, 600], // // 映射到地图的范围
         }),
         style: new Style({
-          fill: new Fill({
-            color: "rgba(255, 255, 255, 0.2",
-          }),
+          // fill: new Fill({
+          //   color: "rgba(255, 255, 255, 0.2)",
+          // }),
           stroke: new Stroke({
             color: "#ffcc33",
             width: 2,
@@ -308,7 +189,7 @@ export default {
 
       this.source = new VectorSource({ wrapX: false });
 
-      this.vector = new VectorLayer({
+      var vector = new VectorLayer({
         source: this.source,
       });
 
@@ -319,7 +200,8 @@ export default {
         }).extend([]),
         layers: [
           imageLayer,
-          this.vector,
+          vector,
+          this.tileLayer,
 
           // vlayer,
         ],
@@ -335,8 +217,6 @@ export default {
       // this.Popup();
 
       this.addIcon();
-
-      this.createPolygon();
     },
 
     changeType(e) {
@@ -361,7 +241,7 @@ export default {
             var last = coordinates[coordinates.length - 1];
             var dx = center[0] - last[0];
             var dy = center[1] - last[1];
-            console.log("绘制", center, last, dx, dy);
+            // console.log("绘制", center, last, dx, dy);
 
             var radius = Math.sqrt(dx * dx + dy * dy);
             var rotation = Math.atan2(dy, dx);
@@ -387,15 +267,139 @@ export default {
           source: this.source,
           type: value,
           geometryFunction: geometryFunction,
-          snapTolerance: 1,
         });
         this.map.addInteraction(this.draw);
       }
     },
 
+    animateDot() {
+      var iconFeatureq = new Feature(new Point([100, 100]));
+      iconFeatureq.set("style", this.createStyle("data/icon.png", undefined));
+      this.multiSource.addFeature(iconFeatureq);
+      this.flash(iconFeatureq);
+    },
+
+    hasRandomFeature() {
+      this.multiSource.getFeatures();
+      // this.multiSource.getFeatures().forEach((val) => {
+      //   console.log("走了", this.multiSource.getFeatures(), val);
+      //   this.flash(val);
+      // });
+
+      // this.testArr.map(val=>{
+      //   console.log("走了", this.multiSource.getFeatures(), val);
+      //    this.flash(val);
+      // })
+    },
+
+    //添加随机的点
+    addRandomFeature() {
+      const x = Math.random() * 100;
+      const y = Math.random() * 100;
+
+      this.feature = new Feature(new Point([x, y]));
+      this.feature.set("style", this.createStyle("data/icon.png", undefined));
+      this.multiSource.addFeature(this.feature);
+      this.flash(this.feature);
+      console.log("随机点", x, y, this.feature);
+    },
+
+    addFeather() {
+      // const that=this
+      // this.multiSource.on('addfeature',function(e){
+      //   that.flash(e)
+      // })
+    },
+    flash(feature) {
+      // this.testArr = [];
+      // this.testArr = this.multiSource.getFeatures();
+
+      const start = Date.now();
+      // const flashGeom = feature.getGeometry().clone();
+      const listenerKey = this.tileLayer.on("postrender", animate);
+      // const listenerKey = this.tileLayer.on("postcompose", animate);
+      const self = this;
+      const duration = 1000;
+      function animate(event) {
+        const frameState = event.frameState;
+        const elapsed = frameState.time - start;
+        if (elapsed >= duration) {
+          unByKey(listenerKey);
+          return;
+        }
+        const vectorContext = getVectorContext(event);
+        const elapsedRatio = elapsed / duration;
+        // radius will be 5 at start and 30 at end.
+        const radius = easeOut(elapsedRatio) * 25 + 5;
+        const opacity = easeOut(1 - elapsedRatio);
+
+        const style = new Style({
+          image: new CircleStyle({
+            radius: radius,
+            stroke: new Stroke({
+              color: "rgba(255, 0, 0, " + opacity + ")",
+              // width: 0.25 + opacity,
+              width: 2 + opacity,
+            }),
+          }),
+        });
+
+        self.multiSource.getFeatures().map((val) => {
+          vectorContext.setStyle(style);
+          vectorContext.drawGeometry(val.getGeometry());
+        });
+
+        // vectorContext.setStyle(style);
+        // vectorContext.drawGeometry(flashGeom);
+        // tell OpenLayers to continue postrender animation
+        self.map.render();
+      }
+    },
+
+    // flash(feature) {
+    //   this.testArr = []
+    //   this.multiSource.getFeatures();
+
+    //   const start = Date.now();
+    //   const flashGeom = feature.getGeometry().clone();
+    //   const listenerKey = this.tileLayer.on("postrender", animate);
+    //   // const listenerKey = this.tileLayer.on("postcompose", animate);
+    //   const self = this;
+    //   const duration = 1000;
+    //   function animate(event) {
+    //     const frameState = event.frameState;
+    //     const elapsed = frameState.time - start;
+    //     if (elapsed >= duration) {
+    //       unByKey(listenerKey);
+    //       return;
+    //     }
+    //     const vectorContext = getVectorContext(event);
+    //     const elapsedRatio = elapsed / duration;
+    //     // radius will be 5 at start and 30 at end.
+    //     const radius = easeOut(elapsedRatio) * 25 + 5;
+    //     const opacity = easeOut(1 - elapsedRatio);
+
+    //     const style = new Style({
+    //       image: new CircleStyle({
+    //         radius: radius,
+    //         stroke: new Stroke({
+    //           color: "rgba(255, 0, 0, " + opacity + ")",
+    //           // width: 0.25 + opacity,
+    //           width: 2 + opacity,
+    //         }),
+    //       }),
+    //     });
+
+    //     vectorContext.setStyle(style);
+    //     vectorContext.drawGeometry(flashGeom);
+    //     // tell OpenLayers to continue postrender animation
+    //     self.map.render();
+    //   }
+    // },
+
     addIcon() {
       var iconFeature = new Feature(new Point([0, 0]));
-      iconFeature.set("style", this.createStar("data/icon.png", undefined));
+      iconFeature.set("style", this.createStyle("data/icon.png", undefined));
 
       var iconFeature1 = new Feature(new Point([60, 0]));
       iconFeature1.set("style", this.createStyle("data/icon.png", undefined));
@@ -445,28 +449,14 @@ export default {
             anchor: [0.5, 1],
             src: require("../../public/static/icon/5ren.png"),
             // src: require('../../../../public/image/5ren.png'),
-            // color: "#f00",
-            // rotation: Math.PI / 4,
-            // opacity: 0.2,
-
-            stroke: new Stroke({
-              color: "#ff0000",
-              width: 30,
-            }),
-          }),
-          fill: new Fill({
-            color: "#1fca04",
-            opacity: 1,
-          }),
-          stroke: new Stroke({
-            color: "#ff0000",
-            width: 3,
+            color: "#f00",
+            rotation: Math.PI / 4,
           }),
           text: new Text({
             text: "锚点显示111",
             scale: [1, 1],
             textAlign: "center",
-            // color: "#f00",
+            color: "#f00",
             textBaseline: "top",
           }),
         })
@@ -477,6 +467,7 @@ export default {
       });
       this.multiSource.addFeature(iconFeature5);
       this.multiSource.addFeature(iconFeature4);
+      this.testArr = [iconFeature5, iconFeature1, iconFeature];
       this.vlayer = new VectorLayer({
         style: function (feature) {
           return feature.get("style");
@@ -530,23 +521,6 @@ export default {
       });
     },
 
-    createStar() {
-      return new Style({
-        image: new RegularShape({
-          points: 5,
-          radius1: 20,
-          radius2: 10,
-          fill: new Fill({
-            color: "#ffff00",
-          }),
-          stroke: new Stroke({
-            width: 1,
-            color: "00ffff",
-          }),
-        }),
-      });
-    },
-
     FenceStyle(f, r) {
       return [
         new Style({
@@ -581,89 +555,6 @@ export default {
           }),
         }),
       ];
-    },
-
-    webSocketPosition() {
-      const self = this;
-      self.systemID = new Date().getTime().toString();
-      var param = JSON.stringify({
-        register: self.systemID,
-      });
-      if ("WebSocket" in window) {
-        let url = "ws://192.168.3.214:8080/socket/websocket/socketServer.do";
-        self.ws = new WebSocket(url);
-        self.ws.onopen = function () {
-          self.webSocketOnSend(param);
-
-          console.log("数据发送中...");
-        };
-        self.ws.onmessage = function (evt) {
-          console.log(evt);
-          //  self.getMessage(evt.data);
-        };
-
-        self.ws.onmessage = function (evt) {
-          console.log(evt.data);
-          self.getMessage(JSON.parse(evt.data));
-        };
-
-        self.ws.onclose = function () {
-          console.log("连接已关闭...");
-        };
-      } else {
-        console.log("您的浏览器不支持WebSocket!");
-      }
-    },
-    webSocketOnSend(data) {
-      const self = this;
-      if (self.ws.readyState === 1) {
-        self.ws.send(data);
-      }
-    },
-
-    getMessage(el) {
-      const self = this;
-      const result = el;
-      if (result.message === "handshake") {
-        let json = JSON.stringify({ key: "1626945204067", layerId: "37" });
-        self.webSocketOnSend(json);
-      } else if (result.message === "Point") {
-        if (self.bLockEx) {
-          self.bLockEx = false;
-          const format = new GeoJSON();
-          const newFeatures = format.readFeatures(result.data);
-          newFeatures.forEach(function (f) {
-            // const coords = _TransPixel(f.getGeometry().getCoordinates());
-            const coords = f.getGeometry().getCoordinates();
-            const tag = self.TagSource.getFeatureById(f.get("resourceId"));
-            if (tag != null) {
-              if (
-                tag.get("pos_x") - 0.3 > f.get("pos_x") ||
-                tag.get("pos_x") + 0.3 < f.get("pos_x") ||
-                tag.get("pos_y") - 0.3 > f.get("pos_y") ||
-                tag.get("pos_y") + 0.3 < f.get("pos_y")
-              ) {
-                tag.set("pos_x", f.get("pos_x"));
-                tag.set("pos_y", f.get("pos_y"));
-                tag.set("axis", f.get("axis"));
-                tag.getGeometry().setCoordinates(coords);
-                // updateOverPopupPosition(tag, coords);
-              }
-            } else {
-              console.log(f);
-              f.getGeometry().setCoordinates(coords);
-              f.setId(f.get("resourceId"));
-              f.set("visible", true);
-              self.TagSource.addFeature(f);
-              self.options.push({
-                label: f.get("itemname"),
-                value: f.get("resourceId"),
-              });
-            }
-          });
-          self.bLockEx = true;
-        }
-      }
     },
   },
 };
